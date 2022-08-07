@@ -1,9 +1,6 @@
-import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
-import '../errors.dart';
 import 'message_types.dart';
 
 const bufferIncSize = 4096;
@@ -11,6 +8,11 @@ const bufferIncSize = 4096;
 class BufferError extends Error {
   final String message;
   BufferError(this.message);
+
+  @override
+  String toString() {
+    return 'BufferError: $message';
+  }
 }
 
 class WriteBuffer {
@@ -78,6 +80,12 @@ class WriteBuffer {
     pos += 4;
   }
 
+  void writeUint64(int i) {
+    _ensureAlloced(8);
+    buffer.setUint64(pos, i);
+    pos += 8;
+  }
+
   void writeInt64(int i) {
     _ensureAlloced(8);
     buffer.setInt64(pos, i);
@@ -90,14 +98,18 @@ class WriteBuffer {
 }
 
 final syncMessage =
-    (WriteMessageBuffer(MessageType.Sync)..endMessage()).unwrap();
+    (WriteMessageBuffer(ClientMessageType.Sync)..endMessage()).unwrap();
 
 class WriteMessageBuffer extends WriteBuffer {
   bool messageFinished = false;
 
-  WriteMessageBuffer(MessageType mtype) {
+  WriteMessageBuffer(ClientMessageType mtype) {
     writeUint8(mtype.value);
     writeInt32(0);
+  }
+
+  void writeFlags(int flags) {
+    writeUint64(flags);
   }
 
   void endMessage() {
@@ -237,6 +249,10 @@ class ReadBuffer {
     return readBytes(size);
   }
 
+  String readString() {
+    return utf8.decode(readLenPrefixedBytes());
+  }
+
   ReadBuffer slice(int size) {
     return ReadBuffer(readBytes(size));
   }
@@ -260,94 +276,12 @@ class ReadMessageBuffer extends ReadBuffer {
     var numFields = readInt16();
     while (numFields > 0) {
       readInt16();
-      readLenPrefixedBytes();
+      discard(readInt32());
       numFields--;
     }
   }
 
-  void finishMessage() {}
-}
-
-Stream<ReadMessageBuffer> createMessageStream(Stream<Uint8List> source) async* {
-  final List<Uint8List> chunks = [];
-  int bufferLength = 0;
-
-  MessageType? messageType;
-  var messageLength = -1;
-
-  await for (var data in source) {
-    chunks.add(data);
-    bufferLength += data.lengthInBytes;
-
-    while (true) {
-      if (messageLength == -1) {
-        if (bufferLength >= 5) {
-          ByteData header;
-          if (chunks[0].length >= 5) {
-            header = ByteData.sublistView(chunks[0]);
-          } else {
-            throw UnimplementedError();
-          }
-
-          messageType = messageTypes[header.getUint8(0)];
-          if (messageType == null) {
-            throw ProtocolError(
-                'unknown message type 0x${header.getUint8(0).toRadixString(16)}'
-                ' (${ascii.decode([header.getUint8(0)])})');
-          }
-          messageLength = header.getInt32(1);
-        } else {
-          break;
-        }
-      }
-
-      if (bufferLength > messageLength) {
-        Uint8List buffer;
-        if (chunks.length == 1 && bufferLength > messageLength) {
-          buffer = Uint8List.sublistView(chunks[0], 5, messageLength + 1);
-          bufferLength -= messageLength + 1;
-          if (bufferLength == 0) {
-            chunks.clear();
-          } else {
-            chunks[0] = Uint8List.sublistView(chunks[0], messageLength + 1);
-          }
-        } else {
-          throw UnimplementedError();
-        }
-        messageLength = -1;
-
-        yield ReadMessageBuffer(messageType!, buffer);
-      } else {
-        break;
-      }
-    }
-  }
-}
-
-class MessageTransport {
-  late StreamSubscription<ReadMessageBuffer> _sub;
-  Completer<ReadMessageBuffer>? _messageAwaiter;
-
-  MessageTransport(Socket sock) {
-    _sub = createMessageStream(sock).listen((message) {
-      print('got message: ${message.messageType.name}');
-      if (_messageAwaiter == null) {
-        throw StateError(
-            'received message from stream while not waiting for message');
-      }
-      _sub.pause();
-      _messageAwaiter!.complete(message);
-      _messageAwaiter = null;
-    });
-    _sub.pause();
-  }
-
-  Future<ReadMessageBuffer> takeMessage() {
-    if (_messageAwaiter != null) {
-      return _messageAwaiter!.future;
-    }
-    _messageAwaiter = Completer();
-    _sub.resume();
-    return _messageAwaiter!.future;
+  void finishMessage() {
+    finish();
   }
 }

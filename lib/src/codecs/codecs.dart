@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:edgedb/src/codecs/consts.dart';
 
 import '../primitives/buffer.dart';
@@ -6,15 +8,15 @@ import 'registry.dart';
 
 abstract class Codec {
   final String tid;
-  late final List<int> tidBuffer;
+  late final Uint8List tidBuffer;
 
   Codec(this.tid) {
     if (tid.length != 32) {
       throw ArgumentError('invalid uuid');
     }
-    tidBuffer = List.generate(
+    tidBuffer = Uint8List.fromList(List.generate(
         16, (int i) => int.parse(tid.substring(i * 2, i * 2 + 2), radix: 16),
-        growable: false);
+        growable: false));
   }
 
   void encode(WriteBuffer buf, dynamic object);
