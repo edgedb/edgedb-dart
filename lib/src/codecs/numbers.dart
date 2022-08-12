@@ -1,3 +1,4 @@
+import '../errors/errors.dart';
 import '../primitives/buffer.dart';
 import 'codecs.dart';
 
@@ -5,10 +6,38 @@ class Int16Codec extends ScalarCodec {
   Int16Codec(super.tid);
 
   @override
-  void encode(WriteBuffer buf, dynamic object) {}
+  void encode(WriteBuffer buf, dynamic object) {
+    if (object is! int) {
+      throw InvalidArgumentError(
+          'an int was expected, got ${object.runtimeType}');
+    }
+    buf.writeInt32(2);
+    buf.writeInt16(object);
+  }
 
   @override
-  dynamic decode(ReadBuffer buf) {}
+  int decode(ReadBuffer buf) {
+    return buf.readInt16();
+  }
+}
+
+class Int32Codec extends ScalarCodec {
+  Int32Codec(super.tid);
+
+  @override
+  void encode(WriteBuffer buf, dynamic object) {
+    if (object is! int) {
+      throw InvalidArgumentError(
+          'an int was expected, got ${object.runtimeType}');
+    }
+    buf.writeInt32(4);
+    buf.writeInt32(object);
+  }
+
+  @override
+  int decode(ReadBuffer buf) {
+    return buf.readInt32();
+  }
 }
 
 class Int64Codec extends ScalarCodec {
@@ -17,14 +46,53 @@ class Int64Codec extends ScalarCodec {
   @override
   void encode(WriteBuffer buf, dynamic object) {
     if (object is! int) {
-      throw ArgumentError('an int was expected, got $object');
+      throw InvalidArgumentError(
+          'an int was expected, got ${object.runtimeType}');
     }
     buf.writeInt32(8);
     buf.writeInt64(object);
   }
 
   @override
-  dynamic decode(ReadBuffer buf) {
+  int decode(ReadBuffer buf) {
     return buf.readInt64();
+  }
+}
+
+class Float32Codec extends ScalarCodec {
+  Float32Codec(super.tid);
+
+  @override
+  void encode(WriteBuffer buf, dynamic object) {
+    if (object is! num) {
+      throw InvalidArgumentError(
+          'an num was expected, got ${object.runtimeType}');
+    }
+    buf.writeInt32(4);
+    buf.writeFloat32(object.toDouble());
+  }
+
+  @override
+  double decode(ReadBuffer buf) {
+    return buf.readFloat32();
+  }
+}
+
+class Float64Codec extends ScalarCodec {
+  Float64Codec(super.tid);
+
+  @override
+  void encode(WriteBuffer buf, dynamic object) {
+    if (object is! num) {
+      throw InvalidArgumentError(
+          'an num was expected, got ${object.runtimeType}');
+    }
+    buf.writeInt32(8);
+    buf.writeFloat64(object.toDouble());
+  }
+
+  @override
+  double decode(ReadBuffer buf) {
+    return buf.readFloat64();
   }
 }

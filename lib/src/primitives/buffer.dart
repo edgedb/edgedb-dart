@@ -80,15 +80,21 @@ class WriteBuffer {
     pos += 4;
   }
 
-  void writeUint64(int i) {
-    _ensureAlloced(8);
-    buffer.setUint64(pos, i);
-    pos += 8;
-  }
-
   void writeInt64(int i) {
     _ensureAlloced(8);
     buffer.setInt64(pos, i);
+    pos += 8;
+  }
+
+  void writeFloat32(double i) {
+    _ensureAlloced(4);
+    buffer.setFloat32(pos, i);
+    pos += 4;
+  }
+
+  void writeFloat64(double i) {
+    _ensureAlloced(8);
+    buffer.setFloat64(pos, i);
     pos += 8;
   }
 
@@ -109,7 +115,7 @@ class WriteMessageBuffer extends WriteBuffer {
   }
 
   void writeFlags(int flags) {
-    writeUint64(flags);
+    writeInt64(flags);
   }
 
   void endMessage() {
@@ -209,13 +215,6 @@ class ReadBuffer {
     return num;
   }
 
-  int readUint64() {
-    _checkOverread(8);
-    final num = buffer.getUint64(pos);
-    pos += 8;
-    return num;
-  }
-
   int readInt64() {
     _checkOverread(8);
     final num = buffer.getInt64(pos);
@@ -259,11 +258,12 @@ class ReadBuffer {
 
   String readUUID() {
     _checkOverread(16);
-    final first = buffer.getInt64(pos);
-    final second = buffer.getInt64(pos + 8);
+    final uuid = buffer.getUint32(pos).toRadixString(16).padLeft(8, '0') +
+        buffer.getUint32(pos + 4).toRadixString(16).padLeft(8, '0') +
+        buffer.getUint32(pos + 8).toRadixString(16).padLeft(8, '0') +
+        buffer.getUint32(pos + 12).toRadixString(16).padLeft(8, '0');
     pos += 16;
-    return first.toRadixString(16).padLeft(16, '0') +
-        second.toRadixString(16).padLeft(16, '0');
+    return uuid;
   }
 }
 

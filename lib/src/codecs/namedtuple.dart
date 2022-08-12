@@ -19,35 +19,37 @@
 import '../errors/errors.dart';
 import '../primitives/buffer.dart';
 import 'codecs.dart';
-import 'consts.dart';
 
-class TupleCodec extends Codec {
+class NamedTupleCodec extends Codec {
   final List<Codec> subCodecs;
+  final List<String> names;
 
-  TupleCodec(super.tid, this.subCodecs);
+  NamedTupleCodec(super.tid, this.subCodecs, this.names);
 
   @override
   void encode(WriteBuffer buf, dynamic object) {
-    throw InvalidArgumentError("Tuples cannot be passed in query arguments");
+    throw InvalidArgumentError(
+        'Named tuples cannot be passed in query arguments');
   }
 
   @override
   dynamic decode(ReadBuffer buf) {
     final els = buf.readUint32();
     if (els != subCodecs.length) {
-      throw ProtocolError('cannot decode Tuple: expected '
+      throw ProtocolError('cannot decode NamedTuple: expected  '
           '${subCodecs.length} elements, got $els');
     }
 
-    final result = [];
+    final result = <String, dynamic>{};
     for (var i = 0; i < els; i++) {
       buf.discard(4); // reserved
       final elemLen = buf.readInt32();
+      final name = names[i];
       if (elemLen == -1) {
-        result.add(null);
+        result[name] = null;
       } else {
         final elemBuf = buf.slice(elemLen);
-        result.add(subCodecs[i].decode(elemBuf));
+        result[name] = subCodecs[i].decode(elemBuf);
         elemBuf.finish();
       }
     }
@@ -55,38 +57,3 @@ class TupleCodec extends Codec {
     return result;
   }
 }
-
-final emptyTupleCodecBuffer = (WriteBuffer()
-      ..writeInt32(4)
-      ..writeInt32(0))
-    .unwrap();
-
-class EmptyTupleCodec extends Codec {
-  EmptyTupleCodec(super.tid);
-
-  @override
-  void encode(WriteBuffer buf, dynamic object) {
-    if (object is! List) {
-      throw InvalidArgumentError(
-          'cannot encode empty Tuple: expected an array');
-    }
-    if (object.isNotEmpty) {
-      throw InvalidArgumentError(
-          'cannot encode empty Tuple: expected 0 elements got ${object.length}');
-    }
-    buf.writeInt32(4);
-    buf.writeInt32(0);
-  }
-
-  @override
-  dynamic decode(ReadBuffer buf) {
-    final els = buf.readInt32();
-    if (els != 0) {
-      throw ProtocolError(
-          'cannot decode empty Tuple: expected 0 elements, received $els');
-    }
-    return [];
-  }
-}
-
-final emptyTupleCodec = EmptyTupleCodec(emptyTupleCodecID);

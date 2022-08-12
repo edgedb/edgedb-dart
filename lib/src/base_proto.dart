@@ -1,39 +1,22 @@
 import 'dart:convert';
+import 'dart:developer';
 import 'dart:typed_data';
 
 import 'codecs/codecs.dart';
+import 'codecs/object.dart';
 import 'codecs/registry.dart';
+import 'connect_config.dart';
 import 'errors/errors.dart';
 import 'errors/resolve.dart';
+import 'options.dart';
 import 'primitives/buffer.dart';
-import 'primitives/transport.dart';
+import 'primitives/lru.dart';
 import 'primitives/message_types.dart';
-import 'primitives/proto_version.dart';
+import 'primitives/transport.dart';
+import 'primitives/types.dart';
 
 const protoVer = ProtocolVersion(1, 0);
 const minProtoVer = ProtocolVersion(1, 0);
-
-enum Cardinality {
-  noResult(0x6e),
-  atMostOne(0x6f),
-  one(0x41),
-  many(0x6d),
-  atLeastOne(0x4d);
-
-  final int value;
-  const Cardinality(this.value);
-}
-
-final cardinalities = {for (var card in Cardinality.values) card.value: card};
-
-enum OutputFormat {
-  binary(0x62),
-  json(0x6a),
-  none(0x6e);
-
-  final int value;
-  const OutputFormat(this.value);
-}
 
 enum Capabilities {
   none(0),
@@ -52,32 +35,126 @@ final restrictedCapabilities = Capabilities.all.value &
     ~Capabilities.transaction.value &
     ~Capabilities.sessionConfig.value;
 
+enum TransactionStatus {
+  idle(0x49),
+  active(0x100),
+  inTrans(0x54),
+  inError(0x45),
+  unknown(-1);
+
+  final int value;
+  const TransactionStatus(this.value);
+}
+
+final transactionStatuses = {
+  for (var status in TransactionStatus.values) status.value: status
+};
+
+typedef CreateConnection<Connection extends BaseProtocol>
+    = Future<Connection> Function(
+        {required ResolvedConnectConfig config,
+        required CodecsRegistry registry,
+        Duration? timeout});
+
+class ParseResult {
+  final Cardinality cardinality;
+  final Codec inCodec;
+  final Codec outCodec;
+  final int capabilities;
+
+  ParseResult(
+      {required this.cardinality,
+      required this.inCodec,
+      required this.outCodec,
+      required this.capabilities});
+}
+
+class ServerSettings {
+  int? suggestedPoolConcurrency;
+  dynamic systemConfig;
+}
+
+class StateCache {
+  Session session;
+  Uint8List buffer;
+
+  StateCache(this.session, this.buffer);
+}
+
 abstract class BaseProtocol {
   Uint8List? serverSecret;
+  TransactionStatus transactionStatus = TransactionStatus.idle;
+  String? lastStatus;
   ProtocolVersion protocolVersion = protoVer;
-
-  late MessageTransport transport;
-
-  final codecsRegistry = CodecsRegistry();
-
+  final serverSettings = ServerSettings();
+  final MessageTransport transport;
+  final CodecsRegistry codecsRegistry;
+  final queryCodecCache = LRU<int, ParseResult>(capacity: 1000);
+  Codec stateCodec = invalidCodec;
+  StateCache? stateCache;
   bool connected = false;
 
-  Future<void> connect(
-      {required String host,
-      required int port,
-      String? database,
-      required String username,
-      String? password});
+  BaseProtocol({required this.transport, required this.codecsRegistry});
 
-  void parseSyncMessage(ReadMessageBuffer message) {}
+  bool get isClosed {
+    return !connected;
+  }
+
+  Future<void> close() async {
+    return transport.close();
+  }
+
+  // message parsers
 
   void fallthrough(ReadMessageBuffer message) {
     if (message.messageType == MessageType.ParameterStatus) {
-      return;
+      return _parseServerSettings(message);
     }
 
     throw ProtocolError('unexpected "${message.messageType.name}" message '
         '("${ascii.decode([message.messageType.value])}")');
+  }
+
+  void parseSyncMessage(ReadMessageBuffer message) {
+    message.ignoreHeaders();
+    final status = message.readUint8();
+    transactionStatus =
+        transactionStatuses[status] ?? TransactionStatus.unknown;
+  }
+
+  void _parseServerSettings(ReadMessageBuffer message) {
+    final name = message.readString();
+    switch (name) {
+      case 'suggested_pool_concurrency':
+        {
+          serverSettings.suggestedPoolConcurrency =
+              int.parse(message.readString(), radix: 10);
+          break;
+        }
+      case 'system_config':
+        {
+          final buf = ReadBuffer(message.readLenPrefixedBytes());
+          final typedescLen = buf.readInt32() - 16;
+          final typedescId = buf.readUUID();
+          final typedesc = buf.readBytes(typedescLen);
+
+          final codec = codecsRegistry.getCodec(typedescId) ??
+              codecsRegistry.buildCodec(typedesc, protocolVersion);
+          buf.discard(4);
+          final data = codec.decode(buf);
+          buf.finish();
+
+          serverSettings.systemConfig = data;
+          break;
+        }
+      default:
+        {
+          log('unknown server settings name: "$name"');
+          message.discard(message.readInt32());
+        }
+    }
+
+    message.finishMessage();
   }
 
   Error parseErrorMessage(ReadMessageBuffer message) {
@@ -99,12 +176,138 @@ abstract class BaseProtocol {
     return err;
   }
 
-  Future<dynamic> fetch({
-    required String query,
-    dynamic args,
-    required OutputFormat outputFormat,
-    required Cardinality expectedCardinality,
-  }) async {
+  void _parseDescribeStateMessage(ReadMessageBuffer message) {
+    final typedescId = message.readUUID();
+    final typedesc = message.readLenPrefixedBytes();
+
+    stateCodec = codecsRegistry.getCodec(typedescId) ??
+        codecsRegistry.buildCodec(typedesc, protocolVersion);
+    stateCache = null;
+    message.finishMessage();
+  }
+
+  ParseResult _parseDescribeTypeMessage(ReadMessageBuffer message) {
+    message.ignoreHeaders();
+    final capabilities = message.readInt64();
+
+    final cardinality = cardinalitiesByValue[message.readUint8()]!;
+
+    final inTypeId = message.readUUID();
+    final inTypeData = message.readLenPrefixedBytes();
+
+    final outTypeId = message.readUUID();
+    final outTypeData = message.readLenPrefixedBytes();
+
+    message.finishMessage();
+
+    final inCodec = codecsRegistry.getCodec(inTypeId) ??
+        codecsRegistry.buildCodec(inTypeData, protocolVersion);
+
+    final outCodec = codecsRegistry.getCodec(outTypeId) ??
+        codecsRegistry.buildCodec(outTypeData, protocolVersion);
+
+    return ParseResult(
+        cardinality: cardinality,
+        inCodec: inCodec,
+        outCodec: outCodec,
+        capabilities: capabilities);
+  }
+
+  String _parseCommandCompleteMessage(ReadMessageBuffer message) {
+    message
+      ..ignoreHeaders()
+      ..readInt64();
+    final status = message.readString();
+    message
+      ..readUUID() // state type id
+      ..discard(message.readInt32()) // state data
+      ..finishMessage();
+    return status;
+  }
+
+  // query cache methods
+
+  int _getQueryCacheKey(String query, OutputFormat outputFormat,
+      Cardinality expectedCardinality) {
+    final expectOne = expectedCardinality == Cardinality.one ||
+        expectedCardinality == Cardinality.atMostOne;
+    return Object.hash(outputFormat, expectOne, query);
+  }
+
+  int? getQueryCapabilities(String query, OutputFormat outputFormat,
+      Cardinality expectedCardinality) {
+    final key = _getQueryCacheKey(query, outputFormat, expectedCardinality);
+    return queryCodecCache.get(key)?.capabilities;
+  }
+
+  // utils
+
+  void _encodeArgs(WriteBuffer buffer, Codec inCodec, dynamic args) {
+    if (inCodec == nullCodec) {
+      if (args != null) {
+        throw QueryArgumentError(
+            'This query does not contain any query parameters, '
+            'but query arguments were provided to the \'query*()\' method');
+      }
+
+      buffer.writeInt32(0);
+    } else if (inCodec is ObjectCodec) {
+      inCodec.encodeArgs(buffer, args);
+    } else {
+      // Shouldn't ever happen.
+      throw ProtocolError('invalid input codec');
+    }
+  }
+
+  void _encodeParseParams(
+      {required WriteMessageBuffer buffer,
+      required String query,
+      required OutputFormat outputFormat,
+      required Cardinality expectedCardinality,
+      required Session state,
+      required bool privilegedMode
+      // options
+      }) {
+    buffer
+      ..writeFlags(
+          privilegedMode ? Capabilities.all.value : restrictedCapabilities)
+      ..writeFlags(0)
+      ..writeInt64(0)
+      ..writeUint8(outputFormat.value)
+      ..writeUint8(expectedCardinality == Cardinality.one ||
+              expectedCardinality == Cardinality.atMostOne
+          ? Cardinality.atMostOne.value
+          : Cardinality.many.value)
+      ..writeString(query);
+
+    if (state == Session.defaults()) {
+      buffer
+        ..writeBuffer(nullCodec.tidBuffer)
+        ..writeUint32(0);
+    } else {
+      buffer.writeBuffer(stateCodec.tidBuffer);
+      if (stateCodec == invalidCodec) {
+        buffer.writeUint32(0);
+      } else {
+        if (stateCache?.session != state) {
+          final buf = WriteBuffer();
+          stateCodec.encode(buf, serialiseState(state));
+          stateCache = StateCache(state, Uint8List.fromList(buf.unwrap()));
+        }
+        buffer.writeBuffer(stateCache!.buffer);
+      }
+    }
+  }
+
+  // protocol flow
+
+  Future<dynamic> fetch(
+      {required String query,
+      dynamic args,
+      required OutputFormat outputFormat,
+      required Cardinality expectedCardinality,
+      required Session state,
+      bool privilegedMode = false}) async {
     // this._checkState();
 
     final requiredOne = expectedCardinality == Cardinality.one;
@@ -112,46 +315,45 @@ abstract class BaseProtocol {
         requiredOne || expectedCardinality == Cardinality.atMostOne;
     final asJson = outputFormat == OutputFormat.json;
 
-    // const key = this._getQueryCacheKey(query, asJson, expectOne);
-    // const ret = new Array();
+    final key = _getQueryCacheKey(query, outputFormat, expectedCardinality);
     final ret = [];
 
-    // if (this.queryCodecCache.has(key)) {
-    //   const [card, inCodec, outCodec] = this.queryCodecCache.get(key)!;
-    //   this._validateFetchCardinality(card, asJson, requiredOne);
-    //   await this._optimisticExecuteFlow(
-    //     args,
-    //     asJson,
-    //     expectOne,
-    //     requiredOne,
-    //     inCodec,
-    //     outCodec,
-    //     query,
-    //     ret
-    //   );
-    // } else {
+    var cacheItem = queryCodecCache.get(key);
 
-    final parseResult = await _parse(
-      query: query,
-      outputFormat: outputFormat,
-      expectedCardinality: expectedCardinality,
-    );
-    // this._validateFetchCardinality(card, asJson, requiredOne);
-    // this.queryCodecCache.set(key, [card, inCodec, outCodec, capabilities]);
-    // if (this.alwaysUseOptimisticFlow) {
-    await _execute(
-        query: query,
-        args: args,
-        outputFormat: outputFormat,
-        expectedCardinality: expectedCardinality,
-        inCodec: parseResult.inCodec,
-        outCodec: parseResult.outCodec,
-        result: ret);
-    // } else {
-    //   await this._executeFlow(args, inCodec, outCodec, ret);
-    // }
-
-    // }
+    ParseResult? parseResult;
+    if ((cacheItem == null && args != null) ||
+        (stateCodec == invalidCodec && state != Session.defaults())) {
+      parseResult = await _parse(
+          query: query,
+          outputFormat: outputFormat,
+          expectedCardinality: expectedCardinality,
+          state: state,
+          privilegedMode: privilegedMode);
+    }
+    try {
+      await _execute(
+          query: query,
+          args: args,
+          outputFormat: outputFormat,
+          expectedCardinality: expectedCardinality,
+          state: state,
+          inCodec: parseResult?.inCodec ?? cacheItem?.inCodec ?? nullCodec,
+          outCodec: parseResult?.outCodec ?? cacheItem?.outCodec ?? nullCodec,
+          result: ret,
+          privilegedMode: privilegedMode);
+    } on ParameterTypeMismatchError {
+      cacheItem = queryCodecCache.get(key)!;
+      await _execute(
+          query: query,
+          args: args,
+          outputFormat: outputFormat,
+          expectedCardinality: expectedCardinality,
+          state: state,
+          inCodec: parseResult?.inCodec ?? cacheItem.inCodec,
+          outCodec: parseResult?.outCodec ?? cacheItem.outCodec,
+          result: ret,
+          privilegedMode: privilegedMode);
+    }
 
     if (outputFormat == OutputFormat.none) {
       return;
@@ -179,26 +381,98 @@ abstract class BaseProtocol {
     }
   }
 
-  // void _parseDataMessages(Codec codec, List<dynamic> result) {
-  //   const frb = ReadBuffer.alloc();
-  //   const $D = chars.$D;
-  //   const buffer = this.buffer;
+  Future<ParseResult> _parse({
+    required String query,
+    required OutputFormat outputFormat,
+    required Cardinality expectedCardinality,
+    required Session state,
+    required bool privilegedMode,
+    // options
+  }) async {
+    final wb = WriteMessageBuffer(ClientMessageType.Parse)
+      ..writeUint16(0); // no headers
 
-  //   while (buffer.takeMessageType($D)) {
-  //     buffer.consumeMessageInto(frb);
-  //     frb.discard(6);
-  //     result.push(codec.decode(frb));
-  //     frb.finish();
-  //   }
-  // }
+    _encodeParseParams(
+        buffer: wb,
+        query: query,
+        outputFormat: outputFormat,
+        expectedCardinality: expectedCardinality,
+        state: state,
+        privilegedMode: privilegedMode);
+
+    wb
+      ..endMessage()
+      ..writeSync();
+
+    transport.sendMessage(wb);
+
+    ParseResult? parseResult;
+    bool parsing = true;
+    Error? error;
+
+    while (parsing) {
+      final message = await transport.takeMessage();
+
+      switch (message.messageType) {
+        case MessageType.CommandDataDescription:
+          {
+            try {
+              parseResult = _parseDescribeTypeMessage(message);
+              final key =
+                  _getQueryCacheKey(query, outputFormat, expectedCardinality);
+              queryCodecCache.set(key, parseResult);
+            } catch (e) {
+              error = e as Error;
+            }
+            break;
+          }
+
+        case MessageType.ErrorResponse:
+          {
+            error = parseErrorMessage(message);
+            break;
+          }
+
+        case MessageType.StateDataDescription:
+          {
+            _parseDescribeStateMessage(message);
+            break;
+          }
+
+        case MessageType.ReadyForCommand:
+          {
+            parseSyncMessage(message);
+            parsing = false;
+            break;
+          }
+
+        default:
+          fallthrough(message);
+      }
+    }
+
+    if (error != null) {
+      if (error is StateMismatchError) {
+        return _parse(
+            query: query,
+            outputFormat: outputFormat,
+            expectedCardinality: expectedCardinality,
+            state: state,
+            privilegedMode: privilegedMode);
+      }
+      throw error;
+    }
+
+    return parseResult!;
+  }
 
   Future<void> _execute({
     required String query,
     dynamic args,
     required OutputFormat outputFormat,
     required Cardinality expectedCardinality,
-    // state
-    bool privilegedMode = false,
+    required Session state,
+    required bool privilegedMode,
     required Codec inCodec,
     required Codec outCodec,
     required List<dynamic> result,
@@ -212,13 +486,16 @@ abstract class BaseProtocol {
         query: query,
         outputFormat: outputFormat,
         expectedCardinality: expectedCardinality,
+        state: state,
         privilegedMode: privilegedMode);
 
     wb
       ..writeBuffer(inCodec.tidBuffer)
-      ..writeBuffer(outCodec.tidBuffer)
-      // ..writeBytes(this._encodeArgs(args, inCodec))
-      ..writeInt32(0)
+      ..writeBuffer(outCodec.tidBuffer);
+
+    _encodeArgs(wb, inCodec, args);
+
+    wb
       ..endMessage()
       ..writeSync();
 
@@ -249,7 +526,7 @@ abstract class BaseProtocol {
 
         case MessageType.CommandComplete:
           {
-            // this.lastStatus = this._parseCommandCompleteMessage();
+            lastStatus = _parseCommandCompleteMessage(message);
             break;
           }
 
@@ -264,13 +541,9 @@ abstract class BaseProtocol {
           {
             try {
               final parseResult = _parseDescribeTypeMessage(message);
-              // const key = this._getQueryCacheKey(query, asJson, expectOne);
-              // this.queryCodecCache.set(key, [
-              //   newCard,
-              //   inCodec,
-              //   outCodec,
-              //   capabilities,
-              // ]);
+              final key =
+                  _getQueryCacheKey(query, outputFormat, expectedCardinality);
+              queryCodecCache.set(key, parseResult);
               outCodec = parseResult.outCodec;
             } catch (e) {
               error = e as Error;
@@ -278,6 +551,12 @@ abstract class BaseProtocol {
             break;
           }
 
+        case MessageType.StateDataDescription:
+          {
+            _parseDescribeStateMessage(message);
+            break;
+          }
+
         case MessageType.ErrorResponse:
           {
             error = parseErrorMessage(message);
@@ -290,171 +569,20 @@ abstract class BaseProtocol {
     }
 
     if (error != null) {
-      throw error;
-    }
-
-    // if (reExec) {
-    //   this._validateFetchCardinality(newCard!, asJson, requiredOne);
-    //   if (this.isLegacyProtocol) {
-    //     return await this._executeFlow(args, inCodec, outCodec, result);
-    //   } else {
-    //     return await this._optimisticExecuteFlow(
-    //       args,
-    //       asJson,
-    //       expectOne,
-    //       requiredOne,
-    //       inCodec,
-    //       outCodec,
-    //       query,
-    //       result,
-    //       options
-    //     );
-    //   }
-    // }
-  }
-
-  Future<ParseResult> _parse({
-    required String query,
-    required OutputFormat outputFormat,
-    required Cardinality expectedCardinality,
-    // state
-    bool privilegedMode = false,
-    // options
-  }) async {
-    final wb = WriteMessageBuffer(ClientMessageType.Parse)
-      ..writeUint16(0); // no headers
-
-    _encodeParseParams(
-        buffer: wb,
-        query: query,
-        outputFormat: outputFormat,
-        expectedCardinality: expectedCardinality,
-        privilegedMode: privilegedMode);
-
-    wb
-      ..endMessage()
-      ..writeSync();
-
-    transport.sendMessage(wb);
-
-    ParseResult? parseResult;
-    bool parsing = true;
-    Error? error;
-
-    while (parsing) {
-      final message = await transport.takeMessage();
-
-      switch (message.messageType) {
-        case MessageType.CommandDataDescription:
-          {
-            try {
-              parseResult = _parseDescribeTypeMessage(message);
-              //   const key = this._getQueryCacheKey(
-              //     query,
-              //     outputFormat,
-              //     expectedCardinality
-              //   );
-              //   this.queryCodecCache.set(key, [
-              //     newCard,
-              //     inCodec,
-              //     outCodec,
-              //     capabilities,
-              //   ]);
-            } catch (e) {
-              error = e as Error;
-            }
-            break;
-          }
-
-        case MessageType.ErrorResponse:
-          {
-            error = parseErrorMessage(message);
-            break;
-          }
-
-        case MessageType.ReadyForCommand:
-          {
-            parseSyncMessage(message);
-            parsing = false;
-            break;
-          }
-
-        default:
-          fallthrough(message);
+      if (error is StateMismatchError) {
+        return _execute(
+          query: query,
+          args: args,
+          outputFormat: outputFormat,
+          expectedCardinality: expectedCardinality,
+          state: state,
+          inCodec: inCodec,
+          outCodec: outCodec,
+          result: result,
+          privilegedMode: privilegedMode,
+        );
       }
-    }
-
-    if (error != null) {
       throw error;
     }
-
-    return parseResult!;
   }
-
-  void _encodeParseParams(
-      {required WriteMessageBuffer buffer,
-      required String query,
-      required OutputFormat outputFormat,
-      required Cardinality expectedCardinality,
-      // state
-      required bool privilegedMode
-      // options
-      }) {
-    buffer
-      ..writeFlags(
-          privilegedMode ? Capabilities.all.value : restrictedCapabilities)
-      ..writeFlags(0)
-      ..writeUint64(0)
-      ..writeUint8(outputFormat.value)
-      ..writeUint8(expectedCardinality == Cardinality.one ||
-              expectedCardinality == Cardinality.atMostOne
-          ? Cardinality.atMostOne.value
-          : Cardinality.many.value)
-      ..writeString(query);
-
-    // state
-    buffer
-      ..writeBuffer(nullCodec.tidBuffer)
-      ..writeUint32(0);
-  }
-
-  ParseResult _parseDescribeTypeMessage(ReadMessageBuffer message) {
-    message.ignoreHeaders();
-    final capabilities = message.readUint64();
-
-    final cardinality = cardinalities[message.readUint8()]!;
-
-    final inTypeId = message.readUUID();
-    final inTypeData = message.readLenPrefixedBytes();
-
-    final outTypeId = message.readUUID();
-    final outTypeData = message.readLenPrefixedBytes();
-
-    message.finishMessage();
-
-    final inCodec = codecsRegistry.getCodec(inTypeId) ??
-        codecsRegistry.buildCodec(inTypeData, protocolVersion);
-
-    final outCodec = codecsRegistry.getCodec(outTypeId) ??
-        codecsRegistry.buildCodec(outTypeData, protocolVersion);
-
-    return ParseResult(
-        cardinality: cardinality,
-        inCodec: inCodec,
-        outCodec: outCodec,
-        capabilities: capabilities);
-  }
-}
-
-class ParseResult {
-  Cardinality cardinality;
-  Codec inCodec;
-  Codec outCodec;
-  int capabilities;
-
-  ParseResult(
-      {required this.cardinality,
-      required this.inCodec,
-      required this.outCodec,
-      required this.capabilities});
 }

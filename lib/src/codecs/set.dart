@@ -16,10 +16,10 @@
  * limitations under the License.
  */
 
+import '../errors/errors.dart';
 import '../primitives/buffer.dart';
 import 'array.dart';
 import 'codecs.dart';
-import 'registry.dart';
 
 class SetCodec extends Codec {
   final Codec subCodec;
@@ -28,7 +28,7 @@ class SetCodec extends Codec {
 
   @override
   void encode(WriteBuffer buf, dynamic object) {
-    throw CodecError("Sets cannot be passed in query arguments");
+    throw InvalidArgumentError("Sets cannot be passed in query arguments");
   }
 
   @override
@@ -43,14 +43,13 @@ class SetCodec extends Codec {
   dynamic _decodeSetOfArrays(ReadBuffer buf) {
     final ndims = buf.readInt32();
 
-    buf.discard(4); // ignore flags
-    buf.discard(4); // reserved
+    buf.discard(8); // ignore flags + reserved
 
     if (ndims == 0) {
       return [];
     }
     if (ndims != 1) {
-      throw CodecError('expected 1-dimensional array of records of arrays');
+      throw ProtocolError('expected 1-dimensional array of records of arrays');
     }
 
     final len = buf.readUint32();
@@ -64,7 +63,7 @@ class SetCodec extends Codec {
 
       final recSize = buf.readUint32();
       if (recSize != 1) {
-        throw CodecError(
+        throw ProtocolError(
             "expected a record with a single element as an array set "
             "element envelope");
       }
@@ -73,11 +72,11 @@ class SetCodec extends Codec {
 
       final elemLen = buf.readInt32();
       if (elemLen == -1) {
-        throw CodecError("unexpected NULL value in array set element");
+        throw ProtocolError("unexpected NULL value in array set element");
       }
 
       final elemBuf = buf.slice(elemLen);
-      result[i] = subCodec.decode(elemBuf);
+      result.add(subCodec.decode(elemBuf));
       elemBuf.finish();
     }
 
@@ -87,29 +86,28 @@ class SetCodec extends Codec {
   dynamic _decodeSet(ReadBuffer buf) {
     final ndims = buf.readInt32();
 
-    buf.discard(4); // ignore flags
-    buf.discard(4); // reserved
+    buf.discard(8); // ignore flags + reserved
 
     if (ndims == 0) {
       return [];
     }
     if (ndims != 1) {
-      throw CodecError('invalid set dimensinality: $ndims');
+      throw ProtocolError('invalid set dimensinality: $ndims');
     }
 
     final len = buf.readUint32();
 
     buf.discard(4); // ignore the lower bound info
 
-    const result = [];
+    final result = [];
 
     for (var i = 0; i < len; i++) {
       final elemLen = buf.readInt32();
       if (elemLen == -1) {
-        result[i] = null;
+        result.add(null);
       } else {
         final elemBuf = buf.slice(elemLen);
-        result[i] = subCodec.decode(elemBuf);
+        result.add(subCodec.decode(elemBuf));
         elemBuf.finish();
       }
     }

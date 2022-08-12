@@ -1,16 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:edgedb/src/base_proto.dart';
-
+import 'base_proto.dart';
+import 'codecs/registry.dart';
+import 'connect_config.dart';
 import 'errors/errors.dart';
 import 'primitives/buffer.dart';
-import 'primitives/transport.dart';
 import 'primitives/message_types.dart';
-import 'primitives/proto_version.dart';
-import 'utils/bytes_equal.dart';
-
+import 'primitives/transport.dart';
+import 'primitives/types.dart';
 import 'scram.dart';
+import 'utils/bytes_equal.dart';
 
 enum AuthenticationStatus {
   authOK(0),
@@ -23,29 +23,55 @@ enum AuthenticationStatus {
 }
 
 class TCPProtocol extends BaseProtocol {
-  @override
-  Future<void> connect(
-      {required String host,
-      required int port,
-      String? database,
-      required String username,
+  TCPProtocol({required super.transport, required super.codecsRegistry});
+
+  static Future<TCPProtocol> create(
+      {required ResolvedConnectConfig config,
+      required CodecsRegistry registry,
+      Duration? timeout}) async {
+    final address = config.address;
+    try {
+      final sock = await SecureSocket.connect(address.host, address.port,
+          onBadCertificate: (certificate) => true,
+          supportedProtocols: ['edgedb-binary'],
+          timeout: timeout);
+
+      final conn = TCPProtocol(
+          transport: MessageTransport(sock, sock), codecsRegistry: registry);
+
+      await conn._connectHandshake(
+          database: config.database,
+          user: config.user,
+          password: config.password);
+
+      return conn;
+    } on SocketException catch (e) {
+      switch (e.osError?.errorCode) {
+        // case 71: // EPROTO
+        case 111: // ECONNREFUSED
+        case 103: // ECONNABORTED
+        case 104: // ECONNRESET
+        case -2: // ENOTFOUND (DNS name not found)
+        case 2: // ENOENT (unix socket is not created yet)
+          throw ClientConnectionFailedTemporarilyError(e.message);
+        default:
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _connectHandshake(
+      {required String database,
+      required String user,
       String? password}) async {
-    final sock = await SecureSocket.connect(host, port,
-        onBadCertificate: (certificate) => true,
-        supportedProtocols: ['edgedb-binary']);
-    print(sock);
-    print(sock.selectedProtocol);
-
-    transport = MessageTransport(sock, sock);
-
     final handshake = WriteMessageBuffer(ClientMessageType.ClientHandshake)
       ..writeInt16(protoVer.hi)
       ..writeInt16(protoVer.lo)
       ..writeInt16(2)
       ..writeString('user')
-      ..writeString(username)
+      ..writeString(user)
       ..writeString('database')
-      ..writeString(database ?? 'edgedb')
+      ..writeString(database)
       ..writeInt16(0)
       ..endMessage();
 
@@ -79,7 +105,7 @@ class TCPProtocol extends BaseProtocol {
             message.finishMessage();
           } else if (status == AuthenticationStatus.authSASL.value) {
             await authSASL(
-                message: message, username: username, password: password);
+                message: message, username: user, password: password);
           } else {
             throw ProtocolError('unsupported authentication method requested '
                 'by the server: $status');

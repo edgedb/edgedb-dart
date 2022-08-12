@@ -29,4 +29,5 @@ final knownTypeNames = {
 };
 
 const nullCodecID = "00000000000000000000000000000000";
+const invalidCodecID = "ffffffffffffffffffffffffffffffff";
 const emptyTupleCodecID = "000000000000000000000000000000ff";

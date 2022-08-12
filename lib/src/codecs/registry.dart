@@ -1,25 +1,17 @@
 import 'dart:typed_data';
 
-import 'package:edgedb/src/codecs/consts.dart';
-
+import '../errors/errors.dart';
 import '../primitives/buffer.dart';
 import '../primitives/lru.dart';
-import '../primitives/proto_version.dart';
+import '../primitives/types.dart';
 import 'array.dart';
 import 'codecs.dart';
+import 'consts.dart';
+import 'enum.dart';
+import 'namedtuple.dart';
 import 'object.dart';
 import 'set.dart';
 import 'tuple.dart';
-
-class CodecError extends Error {
-  final String message;
-  CodecError(this.message);
-
-  @override
-  String toString() {
-    return 'CodecError: $message';
-  }
-}
 
 const codecsCacheSize = 1000;
 const codecsBuildCacheSize = 200;
@@ -32,6 +24,8 @@ const ctypeTuple = 4;
 const ctypeNamedtuple = 5;
 const ctypeArray = 6;
 const ctypeEnum = 7;
+const ctypeInputShape = 8;
+const ctypeRange = 9;
 
 class CodecsRegistry {
   final codecsBuildCache = LRU<String, Codec>(capacity: codecsBuildCacheSize);
@@ -78,7 +72,7 @@ class CodecsRegistry {
     }
 
     if (codecsList.isEmpty) {
-      throw CodecError('could not build a codec');
+      throw InternalClientError('could not build a codec');
     }
 
     return codecsList.last;
@@ -106,6 +100,7 @@ class CodecsRegistry {
           }
 
         case ctypeShape:
+        case ctypeInputShape:
           {
             final els = frb.readUint16();
             for (var i = 0; i < els; i++) {
@@ -122,6 +117,7 @@ class CodecsRegistry {
             break;
           }
 
+        case ctypeRange:
         case ctypeScalar:
           {
             frb.discard(2);
@@ -150,7 +146,7 @@ class CodecsRegistry {
             frb.discard(2);
             final els = frb.readUint16();
             if (els != 1) {
-              throw CodecError(
+              throw ProtocolError(
                   'cannot handle arrays with more than one dimension');
             }
             frb.discard(4);
@@ -171,6 +167,7 @@ class CodecsRegistry {
           {
             if (t >= 0x7f && t <= 0xff) {
               final annLength = frb.readUint32();
+              // TODO
               // if (t == 0xff) {
               //   const typeName = frb.readBuffer(ann_length).toString("utf8");
               //   const codec =
@@ -183,7 +180,7 @@ class CodecsRegistry {
               // }
               return null;
             } else {
-              throw CodecError(
+              throw InternalClientError(
                   'no codec implementation for EdgeDB data class $t');
             }
           }
@@ -198,19 +195,21 @@ class CodecsRegistry {
           res = scalarCodecs[tid];
           if (res == null) {
             if (knownTypes.containsKey(tid)) {
-              throw CodecError('no Dart codec for ${knownTypes[tid]}');
+              throw InternalClientError('no Dart codec for ${knownTypes[tid]}');
             }
 
-            throw CodecError('node Dart codec for the type with ID $tid');
+            throw InternalClientError(
+                'no Dart codec for the type with ID $tid');
           }
           if (res is! ScalarCodec) {
-            throw CodecError(
+            throw ProtocolError(
                 'could not build scalar codec: base scalar has a non-scalar codec');
           }
           break;
         }
 
       case ctypeShape:
+      case ctypeInputShape:
         {
           final els = frb.readUint16();
           final codecs = <Codec>[];
@@ -222,24 +221,25 @@ class CodecsRegistry {
             final flag = frb.readUint32();
             final card = frb.readUint8();
 
-            final strLen = frb.readUint32();
-            final name = frb.readBytes(strLen).toString();
+            final name = frb.readString();
 
             final pos = frb.readUint16();
             Codec subCodec;
             try {
               subCodec = cl[pos];
             } catch (e) {
-              throw CodecError(
+              throw ProtocolError(
                   'could not build object codec: missing subcodec');
             }
 
-            codecs[i] = subCodec;
-            names[i] = name;
-            flags[i] = flag;
-            cards[i] = card;
+            codecs.add(subCodec);
+            names.add(name);
+            flags.add(flag);
+            cards.add(card);
           }
 
+          // res = t == ctypeInputShape
+          // ? SparseObjectCodec(tid, codecs, names)
           res = ObjectCodec(tid, codecs, names, flags, cards);
           break;
         }
@@ -251,7 +251,7 @@ class CodecsRegistry {
           try {
             subCodec = cl[pos];
           } catch (e) {
-            throw CodecError('could not build set codec: missing subcodec');
+            throw ProtocolError('could not build set codec: missing subcodec');
           }
 
           res = SetCodec(tid, subCodec);
@@ -265,15 +265,15 @@ class CodecsRegistry {
           try {
             res = cl[pos];
           } catch (e) {
-            throw CodecError(
+            throw ProtocolError(
                 'could not build scalar codec: missing a codec for base scalar');
           }
 
           if (res is! ScalarCodec) {
-            throw CodecError(
+            throw ProtocolError(
                 'could not build scalar codec: base scalar has a non-scalar codec');
           }
-          // res = <ICodec>res.derive(tid);
+          res = res.derive(tid);
           break;
         }
 
@@ -282,7 +282,7 @@ class CodecsRegistry {
           final pos = frb.readUint16();
           final els = frb.readUint16();
           if (els != 1) {
-            throw CodecError(
+            throw ProtocolError(
                 'cannot handle arrays with more than one dimension');
           }
           final dimLen = frb.readInt32();
@@ -290,7 +290,8 @@ class CodecsRegistry {
           try {
             subCodec = cl[pos];
           } catch (e) {
-            throw CodecError('could not build array codec: missing subcodec');
+            throw ProtocolError(
+                'could not build array codec: missing subcodec');
           }
           res = ArrayCodec(tid, subCodec, dimLen);
           break;
@@ -309,10 +310,10 @@ class CodecsRegistry {
               try {
                 subCodec = cl[pos];
               } catch (e) {
-                throw CodecError(
+                throw ProtocolError(
                     'could not build tuple codec: missing subcodec');
               }
-              codecs[i] = subCodec;
+              codecs.add(subCodec);
             }
             res = TupleCodec(tid, codecs);
           }
@@ -325,43 +326,52 @@ class CodecsRegistry {
           final codecs = <Codec>[];
           final names = <String>[];
           for (var i = 0; i < els; i++) {
-            final strLen = frb.readUint32();
-            names[i] = frb.readBytes(strLen).toString();
+            names.add(frb.readString());
 
             final pos = frb.readUint16();
             Codec subCodec;
             try {
               subCodec = cl[pos];
             } catch (e) {
-              throw CodecError(
+              throw ProtocolError(
                   'could not build namedtuple codec: missing subcodec');
             }
-            codecs[i] = subCodec;
+            codecs.add(subCodec);
           }
-          // res = NamedTupleCodec(tid, codecs, names);
+          res = NamedTupleCodec(tid, codecs, names);
           break;
         }
 
       case ctypeEnum:
         {
-          /* There's no way to customize ordering in JS, so we
-           simply ignore that information and unpack enums into
-           simple strings.
-        */
           final els = frb.readUint16();
           for (var i = 0; i < els; i++) {
             frb.discard(frb.readUint32());
           }
-          // res = EnumCodec(tid);
+          res = EnumCodec(tid);
           break;
+        }
+
+      case ctypeRange:
+        {
+          final pos = frb.readUint16();
+          Codec subCodec;
+          try {
+            subCodec = cl[pos];
+          } catch (e) {
+            throw ProtocolError(
+                'could not build range codec: missing subcodec');
+          }
+          // res = RangeCodec(tid, subCodec);
         }
     }
 
     if (res == null) {
       if (knownTypes.containsKey(tid)) {
-        throw CodecError('could not build a codec for ${knownTypes[tid]} type');
+        throw InternalClientError(
+            'could not build a codec for ${knownTypes[tid]} type');
       } else {
-        throw CodecError('could not build a codec for $tid type');
+        throw InternalClientError('could not build a codec for $tid type');
       }
     }
 

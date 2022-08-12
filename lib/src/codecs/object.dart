@@ -1,153 +1,135 @@
+import 'dart:typed_data';
+
+import '../errors/errors.dart';
 import '../primitives/buffer.dart';
+import '../primitives/types.dart';
 import 'codecs.dart';
 
 class ObjectCodec extends Codec {
-  List<Codec> codecs;
-  late List<String> names;
-  List<int> cardinalities;
+  final List<Codec> codecs;
+  final List<String> names;
+  final List<Cardinality> cardinalities;
 
   ObjectCodec(
     super.tid,
     this.codecs,
     List<String> names,
     List<int> flags,
-    this.cardinalities,
-  ) {
-    this.names = List.generate(names.length, (i) {
-      final isLinkprop = (flags[i] & (1 << 1)) != 0;
-      return isLinkprop ? '@${names[i]}' : names[i];
-    });
-  }
+    List<int> cards,
+  )   : names = List.generate(names.length, (i) {
+          final isLinkprop = (flags[i] & (1 << 1)) != 0;
+          return isLinkprop ? '@${names[i]}' : names[i];
+        }),
+        cardinalities = [for (var card in cards) cardinalitiesByValue[card]!];
 
   @override
   void encode(WriteBuffer buf, dynamic object) {
     throw ArgumentError("Objects cannot be passed as arguments");
   }
 
-  // encodeArgs(args: any): Buffer {
-  //   if (this.fields[0].name === "0") {
-  //     return this._encodePositionalArgs(args);
-  //   }
-  //   return this._encodeNamedArgs(args);
-  // }
+  void encodeArgs(WriteBuffer buf, dynamic args) {
+    if (names[0] == '0') {
+      _encodePositionalArgs(buf, args);
+    } else {
+      _encodeNamedArgs(buf, args);
+    }
+  }
 
-  // _encodePositionalArgs(args: any): Buffer {
-  //   if (!Array.isArray(args)) {
-  //     throw new Error("an array of arguments was expected");
-  //   }
+  void _encodePositionalArgs(WriteBuffer buf, dynamic args) {
+    if (args is! List) {
+      throw InvalidArgumentError("a List of arguments was expected");
+    }
 
-  //   const codecs = this.codecs;
-  //   const codecsLen = codecs.length;
+    final codecsLen = codecs.length;
 
-  //   if (args.length !== codecsLen) {
-  //     throw new Error(
-  //       `expected ${codecsLen} argument${codecsLen === 1 ? "" : "s"}, got ${
-  //         args.length
-  //       }`
-  //     );
-  //   }
+    if (args.length != codecsLen) {
+      throw QueryArgumentError(
+          'expected $codecsLen argument${codecsLen == 1 ? "" : "s"}, got ${args.length}');
+    }
 
-  //   const elemData = new WriteBuffer();
-  //   for (let i = 0; i < codecsLen; i++) {
-  //     elemData.writeInt32(0); // reserved
-  //     const arg = args[i];
-  //     if (arg == null) {
-  //       const card = this.cardinalities[i];
-  //       if (card === ONE || card === AT_LEAST_ONE) {
-  //         throw new Error(
-  //           `argument ${this.fields[i].name} is required, but received ${arg}`
-  //         );
-  //       }
-  //       elemData.writeInt32(-1);
-  //     } else {
-  //       const codec = codecs[i];
-  //       codec.encode(elemData, arg);
-  //     }
-  //   }
+    final elemData = WriteBuffer();
+    for (var i = 0; i < codecsLen; i++) {
+      elemData.writeInt32(0); // reserved
+      final arg = args[i];
+      if (arg == null) {
+        final card = cardinalities[i];
+        if (card == Cardinality.one || card == Cardinality.atLeastOne) {
+          throw MissingArgumentError(
+              'argument ${names[i]} is required, but received $arg');
+        }
+        elemData.writeInt32(-1);
+      } else {
+        codecs[i].encode(elemData, arg);
+      }
+    }
 
-  //   const elemBuf = elemData.unwrap();
-  //   const buf = new WriteBuffer();
-  //   buf.writeInt32(4 + elemBuf.length);
-  //   buf.writeInt32(codecsLen);
-  //   buf.writeBuffer(elemBuf);
-  //   return buf.unwrap();
-  // }
+    final elemBuf = elemData.unwrap();
+    buf.writeInt32(4 + elemBuf.length);
+    buf.writeInt32(codecsLen);
+    buf.writeBuffer(Uint8List.fromList(elemBuf));
+  }
 
-  // _encodeNamedArgs(args: any): Buffer {
-  //   if (args == null) {
-  //     throw new Error("One or more named arguments expected, received null");
-  //   }
+  void _encodeNamedArgs(WriteBuffer buf, dynamic args) {
+    if (args is! Map<String, dynamic>) {
+      throw InvalidArgumentError(
+          "a Map<String, dynamic> of arguments was expected");
+    }
 
-  //   const keys = Object.keys(args);
-  //   const fields = this.fields;
-  //   const namesSet = this.namesSet;
-  //   const codecs = this.codecs;
-  //   const codecsLen = codecs.length;
+    final keys = args.keys;
+    final codecsLen = codecs.length;
 
-  //   if (keys.length > codecsLen) {
-  //     const extraKeys = keys.filter(key => !namesSet.has(key));
-  //     throw new Error(
-  //       `Unused named argument${
-  //         extraKeys.length === 1 ? "" : "s"
-  //       }: "${extraKeys.join('", "')}"`
-  //     );
-  //   }
+    if (keys.length > codecsLen) {
+      final extraKeys = keys.where((key) => !names.contains(key));
+      throw UnknownArgumentError(
+          'Unused named argument${extraKeys.length == 1 ? "" : "s"}: "${extraKeys.join('", "')}"');
+    }
 
-  //   const elemData = new WriteBuffer();
-  //   for (let i = 0; i < codecsLen; i++) {
-  //     const key = fields[i].name;
-  //     const val = args[key];
+    final elemData = WriteBuffer();
+    for (var i = 0; i < codecsLen; i++) {
+      final key = names[i];
+      final val = args[key];
 
-  //     elemData.writeInt32(0); // reserved bytes
-  //     if (val == null) {
-  //       const card = this.cardinalities[i];
-  //       if (card === ONE || card === AT_LEAST_ONE) {
-  //         throw new Error(
-  //           `argument ${this.fields[i].name} is required, but received ${val}`
-  //         );
-  //       }
-  //       elemData.writeInt32(-1);
-  //     } else {
-  //       const codec = codecs[i];
-  //       codec.encode(elemData, val);
-  //     }
-  //   }
+      elemData.writeInt32(0); // reserved bytes
+      if (val == null) {
+        final card = cardinalities[i];
+        if (card == Cardinality.one || card == Cardinality.atLeastOne) {
+          throw MissingArgumentError(
+              'argument ${names[i]} is required, but received $val');
+        }
+        elemData.writeInt32(-1);
+      } else {
+        codecs[i].encode(elemData, val);
+      }
+    }
 
-  //   const elemBuf = elemData.unwrap();
-  //   const buf = new WriteBuffer();
-  //   buf.writeInt32(4 + elemBuf.length);
-  //   buf.writeInt32(codecsLen);
-  //   buf.writeBuffer(elemBuf);
-  //   return buf.unwrap();
-  // }
+    final elemBuf = elemData.unwrap();
+    buf.writeInt32(4 + elemBuf.length);
+    buf.writeInt32(codecsLen);
+    buf.writeBuffer(Uint8List.fromList(elemBuf));
+  }
 
   @override
   dynamic decode(ReadBuffer buf) {
-    // const codecs = this.codecs;
-    // const fields = this.fields;
+    final els = buf.readUint32();
+    if (els != codecs.length) {
+      throw ProtocolError(
+          'cannot decode Object: expected ${codecs.length} elements, got $els');
+    }
 
-    // const els = buf.readUInt32();
-    // if (els !== codecs.length) {
-    //   throw new Error(
-    //     `cannot decode Object: expected ${codecs.length} elements, got ${els}`
-    //   );
-    // }
+    final result = <String, dynamic>{};
+    for (var i = 0; i < els; i++) {
+      buf.discard(4); // reserved
+      final elemLen = buf.readInt32();
+      final name = names[i];
+      if (elemLen == -1) {
+        result[name] = null;
+      } else {
+        final elemBuf = buf.slice(elemLen);
+        result[name] = codecs[i].decode(elemBuf);
+        elemBuf.finish();
+      }
+    }
 
-    // const elemBuf = ReadBuffer.alloc();
-    // const result: any = {};
-    // for (let i = 0; i < els; i++) {
-    //   buf.discard(4); // reserved
-    //   const elemLen = buf.readInt32();
-    //   const name = fields[i].name;
-    //   let val = null;
-    //   if (elemLen !== -1) {
-    //     buf.sliceInto(elemBuf, elemLen);
-    //     val = codecs[i].decode(elemBuf);
-    //     elemBuf.finish();
-    //   }
-    //   result[name] = val;
-    // }
-
-    // return result;
+    return result;
   }
 }

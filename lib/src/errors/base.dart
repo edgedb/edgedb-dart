@@ -1,4 +1,4 @@
-import 'package:edgedb/src/errors/tags.dart';
+import 'tags.dart';
 
 class EdgeDBError extends Error {
   final String message;

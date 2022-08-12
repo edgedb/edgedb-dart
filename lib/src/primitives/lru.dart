@@ -129,8 +129,8 @@ class Deque<K, V> {
 
 class LRU<K, V> {
   late int _capacity;
-  Map<K, Node<K, V>> _map = {};
-  Deque<K, V> _deque = Deque();
+  final Map<K, Node<K, V>> _map = {};
+  final Deque<K, V> _deque = Deque();
 
   LRU({required int capacity}) {
     if (capacity <= 0) {

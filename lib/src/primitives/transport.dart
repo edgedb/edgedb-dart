@@ -97,4 +97,9 @@ class MessageTransport {
     print(
         'sent message: ${clientMessageTypes[message.buffer.getUint8(0)]!.name}');
   }
+
+  Future<void> close() {
+    print('closing');
+    return _sub.cancel();
+  }
 }

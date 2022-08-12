@@ -16,9 +16,10 @@
  * limitations under the License.
  */
 
+import '../errors/errors.dart';
 import '../primitives/buffer.dart';
 import 'codecs.dart';
-import 'registry.dart';
+import 'tuple.dart';
 
 class ArrayCodec extends Codec {
   final Codec subCodec;
@@ -28,12 +29,12 @@ class ArrayCodec extends Codec {
 
   @override
   void encode(WriteBuffer buf, dynamic object) {
-    if (subCodec is! ScalarCodec) {
-      throw CodecError("only arrays of scalars are supported");
+    if (!(subCodec is ScalarCodec || subCodec is TupleCodec)) {
+      throw InvalidArgumentError("only arrays of scalars are supported");
     }
 
     if (object is! List) {
-      throw CodecError("a list was expected");
+      throw InvalidArgumentError("a list was expected");
     }
 
     final elemData = WriteBuffer();
@@ -41,7 +42,7 @@ class ArrayCodec extends Codec {
 
     if (objLen > 0x7fffffff) {
       // objLen > MAXINT32
-      throw CodecError("too many elements in array");
+      throw InvalidArgumentError("too many elements in array");
     }
 
     for (var i = 0; i < objLen; i++) {
@@ -69,19 +70,19 @@ class ArrayCodec extends Codec {
   dynamic decode(ReadBuffer buf) {
     final ndims = buf.readInt32();
 
-    buf.discard(4); // ignore flags
-    buf.discard(4); // reserved
+    buf.discard(8); // ignore flags + reserved
 
     if (ndims == 0) {
       return [];
     }
     if (ndims != 1) {
-      throw CodecError("only 1-dimensional arrays are supported");
+      throw ProtocolError("only 1-dimensional arrays are supported");
     }
 
     final len = buf.readUint32();
     if (length != -1 && len != length) {
-      throw CodecError('invalid array size: received $len, expected $length');
+      throw ProtocolError(
+          'invalid array size: received $len, expected $length');
     }
 
     buf.discard(4); // ignore the lower bound info
@@ -91,10 +92,10 @@ class ArrayCodec extends Codec {
     for (var i = 0; i < len; i++) {
       final elemLen = buf.readInt32();
       if (elemLen == -1) {
-        result[i] = null;
+        result.add(null);
       } else {
         final elemBuf = buf.slice(elemLen);
-        result[i] = subCodec.decode(elemBuf);
+        result.add(subCodec.decode(elemBuf));
         elemBuf.finish();
       }
     }
