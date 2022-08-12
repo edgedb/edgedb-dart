@@ -11,6 +11,7 @@ import 'enum.dart';
 import 'namedtuple.dart';
 import 'object.dart';
 import 'set.dart';
+import 'sparse_object.dart';
 import 'tuple.dart';
 
 const codecsCacheSize = 1000;
@@ -238,9 +239,9 @@ class CodecsRegistry {
             cards.add(card);
           }
 
-          // res = t == ctypeInputShape
-          // ? SparseObjectCodec(tid, codecs, names)
-          res = ObjectCodec(tid, codecs, names, flags, cards);
+          res = t == ctypeInputShape
+              ? SparseObjectCodec(tid, codecs, names)
+              : ObjectCodec(tid, codecs, names, flags, cards);
           break;
         }
 
