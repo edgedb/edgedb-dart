@@ -120,15 +120,15 @@ class Transaction<Connection extends BaseProtocol> implements Executor {
   }
 
   @override
-  Future<List<Object>> query(String query, [dynamic args]) {
+  Future<List<dynamic>> query(String query, [dynamic args]) {
     return _runOp(
         'query',
-        () async => List.castFrom(await _conn.fetch(
+        () async => await _conn.fetch(
             query: query,
             args: args,
             outputFormat: OutputFormat.binary,
             expectedCardinality: Cardinality.many,
-            state: _holder.options.session)));
+            state: _holder.options.session) as List<dynamic>);
   }
 
   @override
@@ -144,7 +144,7 @@ class Transaction<Connection extends BaseProtocol> implements Executor {
   }
 
   @override
-  Future<Object?> querySingle(String query, [dynamic args]) {
+  Future<dynamic> querySingle(String query, [dynamic args]) {
     return _runOp(
         'querySingle',
         () => _conn.fetch(
@@ -168,15 +168,15 @@ class Transaction<Connection extends BaseProtocol> implements Executor {
   }
 
   @override
-  Future<Object> queryRequiredSingle(String query, [dynamic args]) {
+  Future<dynamic> queryRequiredSingle(String query, [dynamic args]) {
     return _runOp(
         'querySingle',
-        () async => await _conn.fetch(
+        () => _conn.fetch(
             query: query,
             args: args,
             outputFormat: OutputFormat.binary,
             expectedCardinality: Cardinality.one,
-            state: _holder.options.session) as Object);
+            state: _holder.options.session));
   }
 
   @override

@@ -185,12 +185,12 @@ class ClientConnectionHolder<Connection extends BaseProtocol> {
         expectedCardinality: Cardinality.noResult);
   }
 
-  Future<List<Object>> query(String query, [dynamic args]) async {
-    return List.castFrom(await _retryingFetch(
+  Future<List<dynamic>> query(String query, [dynamic args]) async {
+    return await _retryingFetch(
         query: query,
         args: args,
         outputFormat: OutputFormat.binary,
-        expectedCardinality: Cardinality.many));
+        expectedCardinality: Cardinality.many) as List<dynamic>;
   }
 
   Future<String> queryJSON(String query, [dynamic args]) async {
@@ -201,7 +201,7 @@ class ClientConnectionHolder<Connection extends BaseProtocol> {
         expectedCardinality: Cardinality.many) as String;
   }
 
-  Future<Object?> querySingle(String query, [dynamic args]) {
+  Future<dynamic> querySingle(String query, [dynamic args]) {
     return _retryingFetch(
         query: query,
         args: args,
@@ -217,12 +217,12 @@ class ClientConnectionHolder<Connection extends BaseProtocol> {
         expectedCardinality: Cardinality.atMostOne) as String;
   }
 
-  Future<Object> queryRequiredSingle(String query, [dynamic args]) async {
-    return await _retryingFetch(
+  Future<dynamic> queryRequiredSingle(String query, [dynamic args]) {
+    return _retryingFetch(
         query: query,
         args: args,
         outputFormat: OutputFormat.binary,
-        expectedCardinality: Cardinality.one) as Object;
+        expectedCardinality: Cardinality.one);
   }
 
   Future<String> queryRequiredSingleJSON(String query, [dynamic args]) async {
@@ -407,15 +407,15 @@ class ClientPool<Connection extends BaseProtocol> {
 abstract class Executor {
   Future<void> execute(String query, [dynamic args]);
 
-  Future<List<Object>> query(String query, [dynamic args]);
+  Future<List<dynamic>> query(String query, [dynamic args]);
 
   Future<String> queryJSON(String query, [dynamic args]);
 
-  Future<Object?> querySingle(String query, [dynamic args]);
+  Future<dynamic> querySingle(String query, [dynamic args]);
 
   Future<String> querySingleJSON(String query, [dynamic args]);
 
-  Future<Object> queryRequiredSingle(String query, [dynamic args]);
+  Future<dynamic> queryRequiredSingle(String query, [dynamic args]);
 
   Future<String> queryRequiredSingleJSON(String query, [dynamic args]);
 }
@@ -489,7 +489,7 @@ class Client implements Executor {
   }
 
   @override
-  Future<List<Object>> query(String query, [dynamic args]) async {
+  Future<List<dynamic>> query(String query, [dynamic args]) async {
     final holder = await _pool.acquireHolder(_options);
     try {
       return await holder.query(query, args);
@@ -509,7 +509,7 @@ class Client implements Executor {
   }
 
   @override
-  Future<Object?> querySingle(String query, [dynamic args]) async {
+  Future<dynamic> querySingle(String query, [dynamic args]) async {
     final holder = await _pool.acquireHolder(_options);
     try {
       return await holder.querySingle(query, args);
@@ -529,7 +529,7 @@ class Client implements Executor {
   }
 
   @override
-  Future<Object> queryRequiredSingle(String query, [dynamic args]) async {
+  Future<dynamic> queryRequiredSingle(String query, [dynamic args]) async {
     final holder = await _pool.acquireHolder(_options);
     try {
       return await holder.queryRequiredSingle(query, args);
