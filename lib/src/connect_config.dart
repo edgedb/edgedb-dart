@@ -45,7 +45,7 @@ class ConnectConfig {
   String? tlsCA;
   String? tlsCAFile;
   TLSSecurity? tlsSecurity;
-  int? waitUntilAvailable;
+  Duration? waitUntilAvailable;
 
   ConnectConfig(
       {this.dsn,
@@ -286,15 +286,20 @@ String validateHost(String host) {
   return host;
 }
 
-int parseDuration(dynamic duration) {
-  if (duration is int) {
-    if (duration < 0) {
-      throw InterfaceError('invalid waitUntilAvailable duration, must be >= 0');
-    }
-    return duration;
+int parseDuration(dynamic rawDuration) {
+  int duration;
+  if (rawDuration is int) {
+    duration = rawDuration;
+  } else if (rawDuration is Duration) {
+    duration = rawDuration.inMilliseconds;
+  } else {
+    // TODO: parse string durations
+    throw InterfaceError('invalid duration, expected int or Duration');
   }
-  // TODO: parse string durations
-  throw TypeError();
+  if (duration < 0) {
+    throw InterfaceError('invalid waitUntilAvailable duration, must be >= 0');
+  }
+  return duration;
 }
 
 Future<ResolvedConnectConfig> parseConnectConfig(ConnectConfig config) async {

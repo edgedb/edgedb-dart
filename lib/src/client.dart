@@ -563,7 +563,7 @@ Client createClient(
     String? tlsCA,
     String? tlsCAFile,
     TLSSecurity? tlsSecurity,
-    int? waitUntilAvailable,
+    Duration? waitUntilAvailable,
     int? concurrency}) {
   return Client._create(
       ClientPool(
