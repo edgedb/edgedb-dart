@@ -1,0 +1,7 @@
+builders:
+  edgedbBuilder:
+    import: "package:edgedb/builder.dart"
+    builder_factories: ["edgeDBBuilder"]
+    build_extensions: { ".edgeql": [".edgeql.dart", ".edgeql.debug"] }
+    build_to: source
+    auto_apply: root_package

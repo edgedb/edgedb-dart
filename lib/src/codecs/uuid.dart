@@ -24,6 +24,10 @@ class UUIDCodec extends ScalarCodec {
   UUIDCodec(super.tid);
 
   @override
+  // ignore: overridden_fields
+  final returnType = 'String';
+
+  @override
   void encode(WriteBuffer buf, dynamic object) {
     if (object is! String) {
       throw InvalidArgumentError(

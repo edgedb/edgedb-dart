@@ -20,6 +20,7 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'base_proto.dart';
+import 'codecs/codecs.dart';
 import 'codecs/registry.dart';
 import 'connect_config.dart';
 import 'errors/errors.dart';
@@ -140,20 +141,24 @@ class ClientConnectionHolder<Connection extends BaseProtocol> {
     }
   }
 
-  Future<dynamic> _retryingFetch(
+  Future<dynamic> _retryingFetch<T>(
       {required String query,
       dynamic args,
       required OutputFormat outputFormat,
-      required Cardinality expectedCardinality}) async {
+      required Cardinality expectedCardinality,
+      Codec? inCodec,
+      Codec? outCodec}) async {
     dynamic result;
     for (var iteration = 0; true; iteration++) {
       final conn = await getConnection();
       try {
-        result = await conn.fetch(
+        result = await conn.fetch<T>(
             query: query,
             args: args,
             outputFormat: outputFormat,
             expectedCardinality: expectedCardinality,
+            inCodec: inCodec,
+            outCodec: outCodec,
             state: options.session);
       } catch (err) {
         if (err is EdgeDBError &&
@@ -420,6 +425,11 @@ abstract class Executor {
   Future<String> queryRequiredSingleJSON(String query, [dynamic args]);
 }
 
+Future<dynamic> executeWithCodec<T>(Client client, Codec outCodec,
+    Codec inCodec, Cardinality resultCard, String query, dynamic args) {
+  return client._executeWithCodec(outCodec, inCodec, resultCard, query, args);
+}
+
 class Client implements Executor {
   final ClientPool _pool;
   final Options _options;
@@ -543,6 +553,22 @@ class Client implements Executor {
     final holder = await _pool.acquireHolder(_options);
     try {
       return await holder.queryRequiredSingleJSON(query, args);
+    } finally {
+      await holder.release();
+    }
+  }
+
+  Future<dynamic> _executeWithCodec<T>(Codec outCodec, Codec inCodec,
+      Cardinality resultCard, String query, dynamic args) async {
+    final holder = await _pool.acquireHolder(_options);
+    try {
+      return await holder._retryingFetch<T>(
+          query: query,
+          args: args,
+          outputFormat: OutputFormat.binary,
+          expectedCardinality: resultCard,
+          inCodec: inCodec,
+          outCodec: outCodec);
     } finally {
       await holder.release();
     }

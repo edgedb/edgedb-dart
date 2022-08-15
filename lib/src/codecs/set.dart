@@ -18,10 +18,11 @@
 
 import '../errors/errors.dart';
 import '../primitives/buffer.dart';
+import '../utils/indent.dart';
 import 'array.dart';
 import 'codecs.dart';
 
-class SetCodec extends Codec {
+class SetCodec<T> extends Codec {
   final Codec subCodec;
 
   SetCodec(super.tid, this.subCodec);
@@ -99,12 +100,12 @@ class SetCodec extends Codec {
 
     buf.discard(4); // ignore the lower bound info
 
-    final result = [];
+    final result = <T>[];
 
     for (var i = 0; i < len; i++) {
       final elemLen = buf.readInt32();
       if (elemLen == -1) {
-        result.add(null);
+        result.add(null!);
       } else {
         final elemBuf = buf.slice(elemLen);
         result.add(subCodec.decode(elemBuf));
@@ -113,5 +114,10 @@ class SetCodec extends Codec {
     }
 
     return result;
+  }
+
+  @override
+  String toString() {
+    return 'SetCodec ($tid) {\n  ${indent(subCodec.toString())}\n}';
   }
 }

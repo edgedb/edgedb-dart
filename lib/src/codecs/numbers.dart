@@ -6,6 +6,10 @@ class Int16Codec extends ScalarCodec {
   Int16Codec(super.tid);
 
   @override
+  // ignore: overridden_fields
+  final returnType = 'int';
+
+  @override
   void encode(WriteBuffer buf, dynamic object) {
     if (object is! int) {
       throw InvalidArgumentError(
@@ -23,6 +27,10 @@ class Int16Codec extends ScalarCodec {
 
 class Int32Codec extends ScalarCodec {
   Int32Codec(super.tid);
+
+  @override
+  // ignore: overridden_fields
+  final returnType = 'int';
 
   @override
   void encode(WriteBuffer buf, dynamic object) {
@@ -44,6 +52,10 @@ class Int64Codec extends ScalarCodec {
   Int64Codec(super.tid);
 
   @override
+  // ignore: overridden_fields
+  final returnType = 'int';
+
+  @override
   void encode(WriteBuffer buf, dynamic object) {
     if (object is! int) {
       throw InvalidArgumentError(
@@ -63,6 +75,10 @@ class Float32Codec extends ScalarCodec {
   Float32Codec(super.tid);
 
   @override
+  // ignore: overridden_fields
+  final returnType = 'double';
+
+  @override
   void encode(WriteBuffer buf, dynamic object) {
     if (object is! num) {
       throw InvalidArgumentError(
@@ -80,6 +96,10 @@ class Float32Codec extends ScalarCodec {
 
 class Float64Codec extends ScalarCodec {
   Float64Codec(super.tid);
+
+  @override
+  // ignore: overridden_fields
+  final returnType = 'double';
 
   @override
   void encode(WriteBuffer buf, dynamic object) {

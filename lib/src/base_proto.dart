@@ -14,6 +14,7 @@ import 'primitives/lru.dart';
 import 'primitives/message_types.dart';
 import 'primitives/transport.dart';
 import 'primitives/types.dart';
+import 'utils/indent.dart';
 
 const protoVer = ProtocolVersion(1, 0);
 const minProtoVer = ProtocolVersion(1, 0);
@@ -67,6 +68,16 @@ class ParseResult {
       required this.inCodec,
       required this.outCodec,
       required this.capabilities});
+
+  @override
+  String toString() {
+    return 'ParseResult {\n'
+        '  cardinality: $cardinality\n'
+        '  inCodec: ${indent(inCodec.toString())}\n'
+        '  outCodec: ${indent(outCodec.toString())}\n'
+        '  capabilities: $capabilities\n'
+        '}';
+  }
 }
 
 class ServerSettings {
@@ -301,12 +312,14 @@ abstract class BaseProtocol {
 
   // protocol flow
 
-  Future<dynamic> fetch(
+  Future<dynamic> fetch<T>(
       {required String query,
       dynamic args,
       required OutputFormat outputFormat,
       required Cardinality expectedCardinality,
       required Session state,
+      Codec? inCodec,
+      Codec? outCodec,
       bool privilegedMode = false}) async {
     // this._checkState();
 
@@ -316,14 +329,14 @@ abstract class BaseProtocol {
     final asJson = outputFormat == OutputFormat.json;
 
     final key = _getQueryCacheKey(query, outputFormat, expectedCardinality);
-    final ret = [];
+    final ret = <T>[];
 
     var cacheItem = queryCodecCache.get(key);
 
     ParseResult? parseResult;
     if ((cacheItem == null && args != null) ||
         (stateCodec == invalidCodec && state != Session.defaults())) {
-      parseResult = await _parse(
+      parseResult = await parse(
           query: query,
           outputFormat: outputFormat,
           expectedCardinality: expectedCardinality,
@@ -331,26 +344,32 @@ abstract class BaseProtocol {
           privilegedMode: privilegedMode);
     }
     try {
-      await _execute(
+      await execute(
           query: query,
           args: args,
           outputFormat: outputFormat,
           expectedCardinality: expectedCardinality,
           state: state,
-          inCodec: parseResult?.inCodec ?? cacheItem?.inCodec ?? nullCodec,
-          outCodec: parseResult?.outCodec ?? cacheItem?.outCodec ?? nullCodec,
+          inCodec: inCodec ??
+              parseResult?.inCodec ??
+              cacheItem?.inCodec ??
+              nullCodec,
+          outCodec: outCodec ??
+              parseResult?.outCodec ??
+              cacheItem?.outCodec ??
+              nullCodec,
           result: ret,
           privilegedMode: privilegedMode);
     } on ParameterTypeMismatchError {
       cacheItem = queryCodecCache.get(key)!;
-      await _execute(
+      await execute(
           query: query,
           args: args,
           outputFormat: outputFormat,
           expectedCardinality: expectedCardinality,
           state: state,
-          inCodec: parseResult?.inCodec ?? cacheItem.inCodec,
-          outCodec: parseResult?.outCodec ?? cacheItem.outCodec,
+          inCodec: inCodec ?? parseResult?.inCodec ?? cacheItem.inCodec,
+          outCodec: outCodec ?? parseResult?.outCodec ?? cacheItem.outCodec,
           result: ret,
           privilegedMode: privilegedMode);
     }
@@ -362,7 +381,7 @@ abstract class BaseProtocol {
       if (requiredOne == true && ret.isEmpty) {
         throw NoDataError("query returned no data");
       } else {
-        return ret[0] ?? (asJson ? "null" : null);
+        return ret.isEmpty ? (asJson ? "null" : null) : ret[0];
       }
     } else {
       if (ret.isNotEmpty) {
@@ -381,7 +400,7 @@ abstract class BaseProtocol {
     }
   }
 
-  Future<ParseResult> _parse({
+  Future<ParseResult> parse({
     required String query,
     required OutputFormat outputFormat,
     required Cardinality expectedCardinality,
@@ -453,7 +472,7 @@ abstract class BaseProtocol {
 
     if (error != null) {
       if (error is StateMismatchError) {
-        return _parse(
+        return parse(
             query: query,
             outputFormat: outputFormat,
             expectedCardinality: expectedCardinality,
@@ -466,7 +485,7 @@ abstract class BaseProtocol {
     return parseResult!;
   }
 
-  Future<void> _execute({
+  Future<void> execute({
     required String query,
     dynamic args,
     required OutputFormat outputFormat,
@@ -570,7 +589,7 @@ abstract class BaseProtocol {
 
     if (error != null) {
       if (error is StateMismatchError) {
-        return _execute(
+        return execute(
           query: query,
           args: args,
           outputFormat: outputFormat,
