@@ -27,10 +27,17 @@ abstract class Codec {
 
   void encode(WriteBuffer buf, dynamic object);
   dynamic decode(ReadBuffer buf);
+
+  @override
+  String toString() {
+    return '$runtimeType ($tid)';
+  }
 }
 
 abstract class ScalarCodec extends Codec {
   ScalarCodec(super.tid);
+
+  final String returnType = 'dynamic';
 
   derive(String tid) {
     return _scalarCodecConstructors[this.tid]!(this.tid);

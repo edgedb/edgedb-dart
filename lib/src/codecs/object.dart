@@ -3,24 +3,30 @@ import 'dart:typed_data';
 import '../errors/errors.dart';
 import '../primitives/buffer.dart';
 import '../primitives/types.dart';
+import '../utils/indent.dart';
 import 'codecs.dart';
 
+typedef ReturnTypeConstructor = dynamic Function(Map<String, dynamic>);
+
+class ObjectField {
+  final String name;
+  final Codec codec;
+  final Cardinality cardinality;
+
+  ObjectField(this.name, this.codec, this.cardinality);
+}
+
 class ObjectCodec extends Codec {
-  final List<Codec> codecs;
-  final List<String> names;
-  final List<Cardinality> cardinalities;
+  final List<ObjectField> fields;
+  final ReturnTypeConstructor? returnType;
 
   ObjectCodec(
-    super.tid,
-    this.codecs,
-    List<String> names,
-    List<int> flags,
-    List<int> cards,
-  )   : names = List.generate(names.length, (i) {
-          final isLinkprop = (flags[i] & (1 << 1)) != 0;
-          return isLinkprop ? '@${names[i]}' : names[i];
-        }),
-        cardinalities = [for (var card in cards) cardinalitiesByValue[card]!];
+      super.tid, List<Codec> codecs, List<String> names, List<int> cards,
+      {this.returnType})
+      : fields = List.generate(codecs.length, (i) {
+          return ObjectField(
+              names[i], codecs[i], cardinalitiesByValue[cards[i]]!);
+        });
 
   @override
   void encode(WriteBuffer buf, dynamic object) {
@@ -28,7 +34,7 @@ class ObjectCodec extends Codec {
   }
 
   void encodeArgs(WriteBuffer buf, dynamic args) {
-    if (names[0] == '0') {
+    if (fields[0].name == '0') {
       _encodePositionalArgs(buf, args);
     } else {
       _encodeNamedArgs(buf, args);
@@ -40,32 +46,34 @@ class ObjectCodec extends Codec {
       throw InvalidArgumentError("a List of arguments was expected");
     }
 
-    final codecsLen = codecs.length;
+    final fieldsLen = fields.length;
 
-    if (args.length != codecsLen) {
+    if (args.length != fieldsLen) {
       throw QueryArgumentError(
-          'expected $codecsLen argument${codecsLen == 1 ? "" : "s"}, got ${args.length}');
+          'expected $fieldsLen argument${fieldsLen == 1 ? "" : "s"}, got ${args.length}');
     }
 
     final elemData = WriteBuffer();
-    for (var i = 0; i < codecsLen; i++) {
-      elemData.writeInt32(0); // reserved
+    for (var i = 0; i < fieldsLen; i++) {
+      final field = fields[i];
       final arg = args[i];
+
+      elemData.writeInt32(0); // reserved
       if (arg == null) {
-        final card = cardinalities[i];
+        final card = field.cardinality;
         if (card == Cardinality.one || card == Cardinality.atLeastOne) {
           throw MissingArgumentError(
-              'argument ${names[i]} is required, but received $arg');
+              'argument ${field.name} is required, but received $arg');
         }
         elemData.writeInt32(-1);
       } else {
-        codecs[i].encode(elemData, arg);
+        field.codec.encode(elemData, arg);
       }
     }
 
     final elemBuf = elemData.unwrap();
     buf.writeInt32(4 + elemBuf.length);
-    buf.writeInt32(codecsLen);
+    buf.writeInt32(fieldsLen);
     buf.writeBuffer(Uint8List.fromList(elemBuf));
   }
 
@@ -76,60 +84,70 @@ class ObjectCodec extends Codec {
     }
 
     final keys = args.keys;
-    final codecsLen = codecs.length;
+    final fieldsLen = fields.length;
 
-    if (keys.length > codecsLen) {
-      final extraKeys = keys.where((key) => !names.contains(key));
+    if (keys.length > fieldsLen) {
+      final validNames = fields.map((f) => f.name);
+      final extraKeys = keys.where((key) => !validNames.contains(key));
       throw UnknownArgumentError(
           'Unused named argument${extraKeys.length == 1 ? "" : "s"}: "${extraKeys.join('", "')}"');
     }
 
     final elemData = WriteBuffer();
-    for (var i = 0; i < codecsLen; i++) {
-      final key = names[i];
+    for (var i = 0; i < fieldsLen; i++) {
+      final field = fields[i];
+      final key = field.name;
       final val = args[key];
 
       elemData.writeInt32(0); // reserved bytes
       if (val == null) {
-        final card = cardinalities[i];
+        final card = field.cardinality;
         if (card == Cardinality.one || card == Cardinality.atLeastOne) {
           throw MissingArgumentError(
-              'argument ${names[i]} is required, but received $val');
+              'argument ${field.name} is required, but received $val');
         }
         elemData.writeInt32(-1);
       } else {
-        codecs[i].encode(elemData, val);
+        field.codec.encode(elemData, val);
       }
     }
 
     final elemBuf = elemData.unwrap();
     buf.writeInt32(4 + elemBuf.length);
-    buf.writeInt32(codecsLen);
+    buf.writeInt32(fieldsLen);
     buf.writeBuffer(Uint8List.fromList(elemBuf));
   }
 
   @override
   dynamic decode(ReadBuffer buf) {
     final els = buf.readUint32();
-    if (els != codecs.length) {
+    if (els != fields.length) {
       throw ProtocolError(
-          'cannot decode Object: expected ${codecs.length} elements, got $els');
+          'cannot decode Object: expected ${fields.length} elements, got $els');
     }
 
     final result = <String, dynamic>{};
-    for (var i = 0; i < els; i++) {
+    for (var field in fields) {
       buf.discard(4); // reserved
       final elemLen = buf.readInt32();
-      final name = names[i];
+      final name = field.name;
       if (elemLen == -1) {
         result[name] = null;
       } else {
         final elemBuf = buf.slice(elemLen);
-        result[name] = codecs[i].decode(elemBuf);
+        result[name] = field.codec.decode(elemBuf);
         elemBuf.finish();
       }
     }
 
-    return result;
+    return returnType != null ? returnType!(result) : result;
+  }
+
+  @override
+  String toString() {
+    return 'ObjectCodec ($tid) {\n'
+        '${fields.map((field) => '  ${field.name}: (${field.cardinality.name})'
+            ' ${indent(field.codec.toString())}\n').join('')}'
+        '}';
   }
 }

@@ -26,6 +26,10 @@ class StrCodec extends ScalarCodec {
   StrCodec(super.tid);
 
   @override
+  // ignore: overridden_fields
+  final returnType = 'String';
+
+  @override
   void encode(WriteBuffer buf, dynamic object) {
     if (object is! String) {
       throw InvalidArgumentError(

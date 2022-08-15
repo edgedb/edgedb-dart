@@ -215,7 +215,6 @@ class CodecsRegistry {
           final els = frb.readUint16();
           final codecs = <Codec>[];
           final names = <String>[];
-          final flags = <int>[];
           final cards = <int>[];
 
           for (var i = 0; i < els; i++) {
@@ -233,15 +232,16 @@ class CodecsRegistry {
                   'could not build object codec: missing subcodec');
             }
 
+            final isLinkprop = (flag & (1 << 1)) != 0;
+
             codecs.add(subCodec);
-            names.add(name);
-            flags.add(flag);
+            names.add(isLinkprop ? '@$name' : name);
             cards.add(card);
           }
 
           res = t == ctypeInputShape
               ? SparseObjectCodec(tid, codecs, names)
-              : ObjectCodec(tid, codecs, names, flags, cards);
+              : ObjectCodec(tid, codecs, names, cards);
           break;
         }
 
