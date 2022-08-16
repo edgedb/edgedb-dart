@@ -20,4 +20,8 @@ import "text.dart";
 
 class EnumCodec extends StrCodec {
   EnumCodec(super.tid);
+
+  @override
+  // ignore: overridden_fields
+  final returnType = 'String';
 }

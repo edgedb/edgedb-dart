@@ -12,3 +12,4 @@ pubspec.lock
 .vscode/
 
 *.edgeql.dart
+*.edgeql.debug

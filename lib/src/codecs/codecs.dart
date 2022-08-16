@@ -12,6 +12,13 @@ import 'numerics.dart';
 import 'text.dart';
 import 'uuid.dart';
 
+export 'array.dart';
+export 'enum.dart';
+export 'namedtuple.dart';
+export 'object.dart';
+export 'set.dart';
+export 'tuple.dart';
+
 abstract class Codec {
   final String tid;
   late final Uint8List tidBuffer;
@@ -38,6 +45,7 @@ abstract class ScalarCodec extends Codec {
   ScalarCodec(super.tid);
 
   final String returnType = 'dynamic';
+  final String? returnTypeImport = null;
 
   derive(String tid) {
     return _scalarCodecConstructors[this.tid]!(this.tid);

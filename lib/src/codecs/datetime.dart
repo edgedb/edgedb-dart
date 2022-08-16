@@ -26,6 +26,10 @@ class DateTimeCodec extends ScalarCodec {
   DateTimeCodec(super.tid);
 
   @override
+  // ignore: overridden_fields
+  final returnType = 'DateTime';
+
+  @override
   void encode(WriteBuffer buf, dynamic object) {
     if (object is! DateTime) {
       throw InvalidArgumentError(
@@ -43,6 +47,10 @@ class DateTimeCodec extends ScalarCodec {
 
 class DurationCodec extends ScalarCodec {
   DurationCodec(super.tid);
+
+  @override
+  // ignore: overridden_fields
+  final returnType = 'Duration';
 
   @override
   void encode(WriteBuffer buf, dynamic object) {

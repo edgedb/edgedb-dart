@@ -4,4 +4,7 @@ select Movie {
   actors: {
     name
   },
+  bytes := b'hello world',
+  version := sys::get_version(),
+  tup := (123, 'abc'),
 } filter .id = <uuid>$id

@@ -18,13 +18,17 @@
 
 import '../errors/errors.dart';
 import '../primitives/buffer.dart';
+import '../utils/indent.dart';
 import 'codecs.dart';
 import 'consts.dart';
 
+typedef TupleReturnTypeConstructor = dynamic Function(List<dynamic>);
+
 class TupleCodec extends Codec {
   final List<Codec> subCodecs;
+  final TupleReturnTypeConstructor? returnType;
 
-  TupleCodec(super.tid, this.subCodecs);
+  TupleCodec(super.tid, this.subCodecs, {this.returnType});
 
   @override
   void encode(WriteBuffer buf, dynamic object) {
@@ -52,7 +56,16 @@ class TupleCodec extends Codec {
       }
     }
 
-    return result;
+    return returnType != null ? returnType!(result) : result;
+  }
+
+  @override
+  String toString() {
+    var i = 0;
+    return 'TupleCodec ($tid) {\n'
+        '${subCodecs.map((subCodec) => '  ${i++}: '
+            '${indent(subCodec.toString())}\n').join('')}'
+        '}';
   }
 }
 

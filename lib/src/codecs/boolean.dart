@@ -24,6 +24,10 @@ class BoolCodec extends ScalarCodec {
   BoolCodec(super.tid);
 
   @override
+  // ignore: overridden_fields
+  final returnType = 'bool';
+
+  @override
   void encode(WriteBuffer buf, dynamic object) {
     if (object is! bool) {
       throw InvalidArgumentError(

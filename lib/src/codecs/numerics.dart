@@ -10,6 +10,10 @@ class BigIntCodec extends ScalarCodec {
   BigIntCodec(super.tid);
 
   @override
+  // ignore: overridden_fields
+  final returnType = 'BigInt';
+
+  @override
   void encode(WriteBuffer buf, dynamic object) {
     if (object is! BigInt) {
       throw InvalidArgumentError(
