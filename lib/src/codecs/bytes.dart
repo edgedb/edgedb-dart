@@ -26,6 +26,13 @@ class BytesCodec extends ScalarCodec {
   BytesCodec(super.tid);
 
   @override
+  // ignore: overridden_fields
+  final returnType = 'Uint8List';
+  @override
+  // ignore: overridden_fields
+  final returnTypeImport = 'dart:typed_data';
+
+  @override
   void encode(WriteBuffer buf, dynamic object) {
     if (!(object is List<int> || object is Uint8List)) {
       throw InvalidArgumentError(

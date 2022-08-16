@@ -29,7 +29,8 @@ import 'primitives/queues.dart';
 import 'primitives/types.dart';
 import 'retry_connect.dart';
 import 'tcp_proto.dart';
-import 'transaction.dart';
+
+part 'transaction.dart';
 
 class ClientConnectionHolder<Connection extends BaseProtocol> {
   final ClientPool<Connection> _pool;
@@ -99,7 +100,7 @@ class ClientConnectionHolder<Connection extends BaseProtocol> {
   Future<T> transaction<T>(Future<T> Function(Transaction) action) async {
     T result;
     for (var iteration = 0; true; ++iteration) {
-      final transaction = await startTransaction(this);
+      final transaction = await Transaction._startTransaction(this);
 
       var commitFailed = false;
       try {
@@ -108,7 +109,7 @@ class ClientConnectionHolder<Connection extends BaseProtocol> {
           // transaction._waitForConnAbort(),
         ]);
         try {
-          await commit(transaction);
+          await transaction._commit();
         } catch (err) {
           commitFailed = true;
           rethrow;
@@ -116,7 +117,7 @@ class ClientConnectionHolder<Connection extends BaseProtocol> {
       } catch (err) {
         try {
           if (!commitFailed) {
-            await rollback(transaction);
+            await transaction._rollback();
           }
         } catch (rollbackErr) {
           if (rollbackErr is! EdgeDBError) {
@@ -423,11 +424,21 @@ abstract class Executor {
   Future<dynamic> queryRequiredSingle(String query, [dynamic args]);
 
   Future<String> queryRequiredSingleJSON(String query, [dynamic args]);
+
+  Future<dynamic> _executeWithCodec<T>(String methodName, Codec outCodec,
+      Codec inCodec, Cardinality resultCard, String query, dynamic args);
 }
 
-Future<dynamic> executeWithCodec<T>(Client client, Codec outCodec,
-    Codec inCodec, Cardinality resultCard, String query, dynamic args) {
-  return client._executeWithCodec(outCodec, inCodec, resultCard, query, args);
+Future<dynamic> executeWithCodec<T>(
+    Executor executor,
+    String methodName,
+    Codec outCodec,
+    Codec inCodec,
+    Cardinality resultCard,
+    String query,
+    dynamic args) {
+  return executor._executeWithCodec(
+      methodName, outCodec, inCodec, resultCard, query, args);
 }
 
 class Client implements Executor {
@@ -558,8 +569,9 @@ class Client implements Executor {
     }
   }
 
-  Future<dynamic> _executeWithCodec<T>(Codec outCodec, Codec inCodec,
-      Cardinality resultCard, String query, dynamic args) async {
+  @override
+  Future<dynamic> _executeWithCodec<T>(String methodName, Codec outCodec,
+      Codec inCodec, Cardinality resultCard, String query, dynamic args) async {
     final holder = await _pool.acquireHolder(_options);
     try {
       return await holder._retryingFetch<T>(

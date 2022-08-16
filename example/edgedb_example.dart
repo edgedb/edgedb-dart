@@ -8,7 +8,14 @@ void main() async {
 
   final res = await client.getMovieById(id: movieId);
 
+  final res2 = await client.transaction((t) async {
+    return await t.getMovieById(id: movieId);
+  });
+
+  print(res2);
+
   print(res?.actors.map((actor) => actor.name));
+  print(res?.tup.$0);
 
   client.close();
 }

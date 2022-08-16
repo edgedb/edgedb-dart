@@ -2,9 +2,7 @@ import 'package:build/build.dart';
 import 'package:code_builder/code_builder.dart';
 import 'package:dart_style/dart_style.dart';
 import 'package:edgedb/src/codecs/codecs.dart';
-import 'package:edgedb/src/codecs/object.dart';
 import 'package:edgedb/src/codecs/registry.dart';
-import 'package:edgedb/src/codecs/set.dart';
 import 'package:edgedb/src/connect_config.dart';
 import 'package:edgedb/src/errors/errors.dart';
 import 'package:edgedb/src/options.dart';
@@ -41,10 +39,10 @@ class EdgeDBBuilder implements Builder {
         state: Session.defaults(),
         privilegedMode: false);
 
-    if (debug) {
-      await buildStep.writeAsString(
-          inputId.addExtension('.debug'), parseResult.toString());
-    }
+    // if (debug) {
+    await buildStep.writeAsString(
+        inputId.addExtension('.debug'), parseResult.toString());
+    // }
 
     final fileName = basenameWithoutExtension(buildStep.inputId.path);
     final typeName = fileName[0].toUpperCase() + fileName.substring(1);
@@ -78,7 +76,7 @@ class EdgeDBBuilder implements Builder {
 
     file.body.add(Extension((builder) => builder
       ..name = '${typeName}Extension'
-      ..on = Reference('Client', 'package:edgedb/src/client.dart')
+      ..on = Reference('Executor', 'package:edgedb/src/client.dart')
       ..methods.add(Method((builder) {
         builder
           ..name = fileName
@@ -110,6 +108,7 @@ class EdgeDBBuilder implements Builder {
               Reference('executeWithCodec', 'package:edgedb/src/client.dart')
                   .call([
                     Reference('this'),
+                    literalString(fileName),
                     Reference('_outCodec'),
                     inCodec != null
                         ? Reference('_inCodec')
@@ -158,12 +157,16 @@ WalkCodecReturn walkCodec(Codec codec, Cardinality card,
     return WalkCodecReturn(
         TypeReference((ref) => ref
           ..symbol = codec.returnType
-          ..isNullable = card == Cardinality.atMostOne),
-        Reference('scalarCodecs', 'package:edgedb/src/codecs/codecs.dart')
-            .index(literalString(codec.tid))
-            .nullChecked);
+          ..isNullable = card == Cardinality.atMostOne
+          ..url = codec.returnTypeImport),
+        codec is EnumCodec
+            ? Reference('EnumCodec', 'package:edgedb/src/codecs/codecs.dart')
+                .newInstance([literalString(codec.tid)])
+            : Reference('scalarCodecs', 'package:edgedb/src/codecs/codecs.dart')
+                .index(literalString(codec.tid))
+                .nullChecked);
   }
-  if (codec is ObjectCodec) {
+  if (codec is ObjectCodec || codec is NamedTupleCodec) {
     final typeClass = file != null ? (ClassBuilder()..name = typeName) : null;
     final typeConstructor = ConstructorBuilder()
       ..name = '_fromMap'
@@ -173,45 +176,102 @@ WalkCodecReturn walkCodec(Codec codec, Cardinality card,
     final codecs = <Expression>[];
     final names = <Expression>[];
     final cards = <Expression>[];
-    for (var field in codec.fields) {
-      final child = walkCodec(
-          field.codec, field.cardinality, '${typeName}_${field.name}', file);
+
+    void visitField(String name, Codec subcodec, Cardinality cardinality) {
+      final child = walkCodec(subcodec, cardinality, '${typeName}_$name', file);
       final typeField = FieldBuilder()
-        ..name = field.name
+        ..name = name
         ..modifier = FieldModifier.final$
         ..type = child.typeRef;
       typeClass?.fields.add(typeField.build());
-      typeConstructor.initializers.add(Reference(field.name)
-          .assign(Reference('map').index(literalString(field.name)))
+      typeConstructor.initializers.add(Reference(name)
+          .assign(Reference('map').index(literalString(name)))
           .code);
       codecs.add(child.codecExpr);
-      names.add(literalString(field.name));
-      cards.add(literalNum(field.cardinality.value));
+      names.add(literalString(name));
+      cards.add(literalNum(cardinality.value));
     }
+
+    if (codec is ObjectCodec) {
+      for (var field in codec.fields) {
+        visitField(field.name, field.codec, field.cardinality);
+      }
+    } else {
+      for (var field in (codec as NamedTupleCodec).fields) {
+        visitField(field.name, field.codec, Cardinality.one);
+      }
+    }
+
     typeClass?.constructors.add(typeConstructor.build());
-    if (file != null) {}
     file?.body.add(typeClass!.build());
     return WalkCodecReturn(
         Reference(typeName),
-        Reference('ObjectCodec', 'package:edgedb/src/codecs/object.dart')
+        Reference(codec is ObjectCodec ? 'ObjectCodec' : 'NamedTupleCodec',
+                'package:edgedb/src/codecs/codecs.dart')
             .newInstance([
           literalString(codec.tid),
           literalList(codecs),
           literalList(names),
-          literalList(cards),
+          if (codec is ObjectCodec) literalList(cards),
         ], {
           if (typeName != null)
             'returnType': Reference(typeName).property('_fromMap')
         }));
   }
-  if (codec is SetCodec) {
-    final child = walkCodec(codec.subCodec, Cardinality.one, typeName, file);
+  if (codec is SetCodec || codec is ArrayCodec) {
+    final child = walkCodec(
+        (codec is SetCodec) ? codec.subCodec : (codec as ArrayCodec).subCodec,
+        Cardinality.one,
+        typeName,
+        file);
     return WalkCodecReturn(
         TypeReference((builder) => builder
           ..symbol = 'List'
           ..types.add(child.typeRef)),
-        Reference('SetCodec', 'package:edgedb/src/codecs/set.dart').newInstance(
-            [literalString(codec.tid), child.codecExpr], {}, [child.typeRef]));
+        Reference(codec is SetCodec ? 'SetCodec' : 'ArrayCodec',
+                'package:edgedb/src/codecs/codecs.dart')
+            .newInstance([
+          literalString(codec.tid),
+          child.codecExpr,
+          if (codec is ArrayCodec) literalNum(codec.length)
+        ], {}, [
+          child.typeRef
+        ]));
+  }
+  if (codec is TupleCodec) {
+    final typeClass = ClassBuilder()..name = typeName;
+    final typeConstructor = ConstructorBuilder()
+      ..name = '_fromList'
+      ..requiredParameters.add(Parameter((builder) => builder
+        ..name = 'list'
+        ..type = Reference('List<dynamic>')));
+    final codecs = <Expression>[];
+    var i = 0;
+    for (var subCodec in codec.subCodecs) {
+      final name = '\$$i';
+      final child =
+          walkCodec(subCodec, Cardinality.one, '${typeName}_$i', file);
+      final typeField = FieldBuilder()
+        ..name = name
+        ..modifier = FieldModifier.final$
+        ..type = child.typeRef;
+      typeClass.fields.add(typeField.build());
+      typeConstructor.initializers.add(Reference(name)
+          .assign(Reference('list').index(literalNum(i++)))
+          .code);
+      codecs.add(child.codecExpr);
+    }
+    typeClass.constructors.add(typeConstructor.build());
+    file!.body.add(typeClass.build());
+    return WalkCodecReturn(
+        Reference(typeName),
+        Reference('TupleCodec', 'package:edgedb/src/codecs/codecs.dart')
+            .newInstance([
+          literalString(codec.tid),
+          literalList(codecs),
+        ], {
+          'returnType': Reference(typeName).property('_fromList')
+        }));
   }
   throw EdgeDBError('cannot generate type for codec ${codec.runtimeType}');
 }

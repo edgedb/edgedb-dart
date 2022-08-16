@@ -18,13 +18,24 @@
 
 import '../errors/errors.dart';
 import '../primitives/buffer.dart';
+import '../utils/indent.dart';
 import 'codecs.dart';
 
-class NamedTupleCodec extends Codec {
-  final List<Codec> subCodecs;
-  final List<String> names;
+class NamedTupleField {
+  final String name;
+  final Codec codec;
 
-  NamedTupleCodec(super.tid, this.subCodecs, this.names);
+  NamedTupleField(this.name, this.codec);
+}
+
+class NamedTupleCodec extends Codec {
+  final List<NamedTupleField> fields;
+  final ReturnTypeConstructor? returnType;
+
+  NamedTupleCodec(super.tid, List<Codec> subCodecs, List<String> names,
+      {this.returnType})
+      : fields = List.generate(
+            subCodecs.length, (i) => NamedTupleField(names[i], subCodecs[i]));
 
   @override
   void encode(WriteBuffer buf, dynamic object) {
@@ -35,25 +46,33 @@ class NamedTupleCodec extends Codec {
   @override
   dynamic decode(ReadBuffer buf) {
     final els = buf.readUint32();
-    if (els != subCodecs.length) {
+    if (els != fields.length) {
       throw ProtocolError('cannot decode NamedTuple: expected  '
-          '${subCodecs.length} elements, got $els');
+          '${fields.length} elements, got $els');
     }
 
     final result = <String, dynamic>{};
-    for (var i = 0; i < els; i++) {
+    for (var field in fields) {
       buf.discard(4); // reserved
       final elemLen = buf.readInt32();
-      final name = names[i];
+      final name = field.name;
       if (elemLen == -1) {
         result[name] = null;
       } else {
         final elemBuf = buf.slice(elemLen);
-        result[name] = subCodecs[i].decode(elemBuf);
+        result[name] = field.codec.decode(elemBuf);
         elemBuf.finish();
       }
     }
 
-    return result;
+    return returnType != null ? returnType!(result) : result;
+  }
+
+  @override
+  String toString() {
+    return 'NamedTupleCodec ($tid) {\n'
+        '${fields.map((field) => '  ${field.name}: '
+            '${indent(field.codec.toString())}\n').join('')}'
+        '}';
   }
 }
