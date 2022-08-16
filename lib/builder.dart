@@ -1,13 +1,13 @@
 import 'package:build/build.dart';
 import 'package:code_builder/code_builder.dart';
 import 'package:dart_style/dart_style.dart';
+import 'package:edgedb/src/base_proto.dart';
+import 'package:edgedb/src/client.dart';
 import 'package:edgedb/src/codecs/codecs.dart';
-import 'package:edgedb/src/codecs/registry.dart';
 import 'package:edgedb/src/connect_config.dart';
 import 'package:edgedb/src/errors/errors.dart';
 import 'package:edgedb/src/options.dart';
 import 'package:edgedb/src/primitives/types.dart';
-import 'package:edgedb/src/retry_connect.dart';
 import 'package:edgedb/src/tcp_proto.dart';
 import 'package:path/path.dart';
 
@@ -28,16 +28,23 @@ class EdgeDBBuilder implements Builder {
   Future<void> build(BuildStep buildStep) async {
     final inputId = buildStep.inputId;
 
-    final conn = await buildStep.fetchResource(connectionResource);
+    final connPool = await buildStep.fetchResource(connPoolResource);
 
     final query = await buildStep.readAsString(inputId);
 
-    final parseResult = await conn.parse(
-        query: query,
-        outputFormat: OutputFormat.binary,
-        expectedCardinality: Cardinality.many,
-        state: Session.defaults(),
-        privilegedMode: false);
+    ParseResult parseResult;
+
+    final holder = await connPool.acquireHolder(Options.defaults());
+    try {
+      parseResult = await (await holder.getConnection()).parse(
+          query: query,
+          outputFormat: OutputFormat.binary,
+          expectedCardinality: Cardinality.many,
+          state: Session.defaults(),
+          privilegedMode: false);
+    } finally {
+      await holder.release();
+    }
 
     // if (debug) {
     await buildStep.writeAsString(
@@ -118,10 +125,12 @@ class EdgeDBBuilder implements Builder {
                             'package:edgedb/src/primitives/types.dart')
                         .property(parseResult.cardinality.name),
                     Reference('_query'),
-                    literalMap({
-                      for (var field in inCodec?.fields ?? [])
-                        literalString(field.name): Reference(field.name)
-                    }, Reference('String'), Reference('dynamic'))
+                    inCodec != null
+                        ? literalMap({
+                            for (var field in inCodec.fields)
+                              literalString(field.name): Reference(field.name)
+                          }, Reference('String'), Reference('dynamic'))
+                        : literalNull
                   ], {}, [
                     returnType.typeRef
                   ])
@@ -276,8 +285,8 @@ WalkCodecReturn walkCodec(Codec codec, Cardinality card,
   throw EdgeDBError('cannot generate type for codec ${codec.runtimeType}');
 }
 
-final connectionResource = Resource(() async {
-  final config = await parseConnectConfig(
-      ConnectConfig(host: 'localhost', database: '_example'));
-  return retryingConnect(TCPProtocol.create, config, CodecsRegistry());
+final connPoolResource = Resource(() async {
+  return ClientPool(TCPProtocol.create,
+      ConnectConfig(host: 'localhost', database: '_example'),
+      concurrency: 5);
 });
