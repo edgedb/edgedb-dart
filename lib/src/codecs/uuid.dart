@@ -49,7 +49,7 @@ class UUIDCodec extends ScalarCodec {
   @override
   String decode(ReadBuffer buf) {
     final uuid = buf.readUUID();
-    return '${uuid.substring(0, 4)}-${uuid.substring(4, 6)}-'
-        '${uuid.substring(6, 8)}-${uuid.substring(8, 10)}-${uuid.substring(10)}';
+    return '${uuid.substring(0, 8)}-${uuid.substring(8, 12)}-'
+        '${uuid.substring(12, 16)}-${uuid.substring(16, 20)}-${uuid.substring(20)}';
   }
 }

@@ -42,7 +42,7 @@ class SparseObjectCodec extends Codec {
     final elemData = elemBuf.unwrap();
     buf.writeInt32(4 + elemData.length);
     buf.writeInt32(objLen);
-    buf.writeBuffer(Uint8List.fromList(elemData));
+    buf.writeBuffer(elemData as Uint8List);
   }
 
   @override

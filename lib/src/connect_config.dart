@@ -25,6 +25,10 @@ enum TLSSecurity {
 
   final String value;
   const TLSSecurity(this.value);
+
+  String toJson() {
+    return value;
+  }
 }
 
 final tlsSecurityValues = {
@@ -62,6 +66,41 @@ class ConnectConfig {
       this.tlsCAFile,
       this.tlsSecurity,
       this.waitUntilAvailable});
+
+  ConnectConfig.fromJson(Map<String, dynamic> json)
+      : dsn = json['dsn'],
+        instanceName = json['instanceName'],
+        credentials = json['credentials'],
+        credentialsFile = json['credentialsFile'],
+        host = json['host'],
+        port = json['port'],
+        database = json['database'],
+        user = json['user'],
+        password = json['password'],
+        serverSettings = json['serverSettings'],
+        tlsCA = json['tlsCA'],
+        tlsCAFile = json['tlsCAFile'],
+        tlsSecurity = tlsSecurityValues[json['tlsSecurity']],
+        waitUntilAvailable = json['waitUntilAvailable'];
+
+  Map<String, dynamic> toJson() {
+    return {
+      'dsn': dsn,
+      'instanceName': instanceName,
+      'credentials': credentials,
+      'credentialsFile': credentialsFile,
+      'host': host,
+      'port': port,
+      'database': database,
+      'user': user,
+      'password': password,
+      'serverSettings': serverSettings,
+      'tlsCA': tlsCA,
+      'tlsCAFile': tlsCAFile,
+      'tlsSecurity': tlsSecurity,
+      'waitUntilAvailable': waitUntilAvailable,
+    };
+  }
 }
 
 class SourcedValue<T> {

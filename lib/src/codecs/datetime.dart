@@ -41,7 +41,7 @@ class DateTimeCodec extends ScalarCodec {
 
   @override
   DateTime decode(ReadBuffer buf) {
-    return DateTime.fromMicrosecondsSinceEpoch(buf.readInt64());
+    return DateTime.fromMicrosecondsSinceEpoch(buf.readInt64() + timeshift);
   }
 }
 

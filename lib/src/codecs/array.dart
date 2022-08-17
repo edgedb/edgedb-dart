@@ -16,6 +16,8 @@
  * limitations under the License.
  */
 
+import 'dart:typed_data';
+
 import '../errors/errors.dart';
 import '../primitives/buffer.dart';
 import '../utils/indent.dart';
@@ -63,7 +65,7 @@ class ArrayCodec<T> extends Codec {
     buf.writeInt32(objLen);
     buf.writeInt32(1);
 
-    buf.writeBytes(elemBuf);
+    buf.writeBuffer(elemBuf as Uint8List);
   }
 
   @override

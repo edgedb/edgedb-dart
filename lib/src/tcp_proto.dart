@@ -37,7 +37,10 @@ class TCPProtocol extends BaseProtocol {
           timeout: timeout);
 
       final conn = TCPProtocol(
-          transport: MessageTransport(sock, sock), codecsRegistry: registry);
+          transport: MessageTransport(sock, sock, onError: (e) {
+            throw e;
+          }),
+          codecsRegistry: registry);
 
       await conn._connectHandshake(
           database: config.database,
@@ -121,7 +124,7 @@ class TCPProtocol extends BaseProtocol {
           parseSyncMessage(message);
 
           connected = true;
-          print('connected');
+          // print('connected');
           return;
         case MessageType.StateDataDescription:
           break;

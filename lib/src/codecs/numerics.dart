@@ -49,8 +49,8 @@ class BigIntCodec extends ScalarCodec {
       ..writeUint16(digits.length - 1) // weight
       ..writeUint16(sign)
       ..writeUint16(0); // dscale
-    for (var digit in digits) {
-      buf.writeUint16(digit);
+    for (var i = digits.length - 1; i >= 0; i--) {
+      buf.writeUint16(digits[i]);
     }
   }
 
