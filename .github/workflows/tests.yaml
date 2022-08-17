@@ -1,0 +1,62 @@
+name: tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    # Skip tests when doing a release to avoid the workflow race
+    # when the release PR gets merged by the bot.
+    if: needs.prep.outputs.version == 0
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-2019]
+        edgedb-version: ["stable"]
+        include:
+          - os: ubuntu-latest
+            edgedb-version: "nightly"
+
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          fetch-depth: 50
+          submodules: true
+
+      - name: Setup WSL
+        if: ${{ matrix.os == 'windows-2019' }}
+        uses: vampire/setup-wsl@v1
+        with:
+          wsl-shell-user: edgedb
+          additional-packages: ca-certificates
+            curl
+
+      - name: Set up Dart
+        uses: dart-lang/setup-dart@v1.3
+
+      # - name: Lint
+      #   run: |
+      #     dart analyze
+
+      - name: Install EdgeDB
+        uses: edgedb/setup-edgedb@v1
+        with:
+          server-version: ${{ matrix.edgedb-version }}
+
+      - name: Run functional tests
+        run: |
+          dart run test/run.dart
+
+  # This job exists solely to act as the test job aggregate to be
+  # targeted by branch policies.
+  regression-tests:
+    name: "Regression Tests"
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo OK

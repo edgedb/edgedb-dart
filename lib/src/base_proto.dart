@@ -121,6 +121,16 @@ abstract class BaseProtocol {
     if (message.messageType == MessageType.ParameterStatus) {
       return _parseServerSettings(message);
     }
+    if (message.messageType == MessageType.LogMessage) {
+      final severity = message.readUint8();
+      final code = message.readUint32();
+      final logMessage = message.readString();
+      message
+        ..ignoreHeaders()
+        ..finishMessage();
+      print('SERVER MESSAGE | $severity $code | $logMessage');
+      return;
+    }
 
     throw ProtocolError('unexpected "${message.messageType.name}" message '
         '("${ascii.decode([message.messageType.value])}")');
@@ -303,7 +313,7 @@ abstract class BaseProtocol {
         if (stateCache?.session != state) {
           final buf = WriteBuffer();
           stateCodec.encode(buf, serialiseState(state));
-          stateCache = StateCache(state, Uint8List.fromList(buf.unwrap()));
+          stateCache = StateCache(state, buf.unwrap() as Uint8List);
         }
         buffer.writeBuffer(stateCache!.buffer);
       }

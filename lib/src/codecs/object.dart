@@ -74,7 +74,7 @@ class ObjectCodec extends Codec {
     final elemBuf = elemData.unwrap();
     buf.writeInt32(4 + elemBuf.length);
     buf.writeInt32(fieldsLen);
-    buf.writeBuffer(Uint8List.fromList(elemBuf));
+    buf.writeBuffer(elemBuf as Uint8List);
   }
 
   void _encodeNamedArgs(WriteBuffer buf, dynamic args) {
@@ -115,7 +115,7 @@ class ObjectCodec extends Codec {
     final elemBuf = elemData.unwrap();
     buf.writeInt32(4 + elemBuf.length);
     buf.writeInt32(fieldsLen);
-    buf.writeBuffer(Uint8List.fromList(elemBuf));
+    buf.writeBuffer(elemBuf as Uint8List);
   }
 
   @override

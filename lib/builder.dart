@@ -285,8 +285,9 @@ WalkCodecReturn walkCodec(Codec codec, Cardinality card,
   throw EdgeDBError('cannot generate type for codec ${codec.runtimeType}');
 }
 
+ClientPool? _connPool;
 final connPoolResource = Resource(() async {
-  return ClientPool(TCPProtocol.create,
+  return _connPool ??= ClientPool(TCPProtocol.create,
       ConnectConfig(host: 'localhost', database: '_example'),
       concurrency: 5);
-});
+}, beforeExit: () => _connPool?.close());

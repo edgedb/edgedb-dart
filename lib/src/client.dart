@@ -297,7 +297,7 @@ class ClientPool<Connection extends BaseProtocol> {
   void _resizeHolderPool() {
     final holdersDiff = _concurrency - _holders.length;
     if (holdersDiff > 0) {
-      print('resizing pool to $_concurrency');
+      // print('resizing pool to $_concurrency');
       for (var i = 0; i < holdersDiff; i++) {
         final holder = ClientConnectionHolder(this);
         _holders.add(holder);
@@ -602,25 +602,27 @@ Client createClient(
     String? tlsCAFile,
     TLSSecurity? tlsSecurity,
     Duration? waitUntilAvailable,
+    ConnectConfig? config,
     int? concurrency}) {
   return Client._create(
       ClientPool(
           TCPProtocol.create,
           ConnectConfig(
-              dsn: dsn,
-              instanceName: instanceName,
-              credentials: credentials,
-              credentialsFile: credentialsFile,
-              host: host,
-              port: port,
-              database: database,
-              user: user,
-              password: password,
-              serverSettings: serverSettings,
-              tlsCA: tlsCA,
-              tlsCAFile: tlsCAFile,
-              tlsSecurity: tlsSecurity,
-              waitUntilAvailable: waitUntilAvailable),
+              dsn: dsn ?? config?.dsn,
+              instanceName: instanceName ?? config?.instanceName,
+              credentials: credentials ?? config?.credentials,
+              credentialsFile: credentialsFile ?? config?.credentialsFile,
+              host: host ?? config?.host,
+              port: port ?? config?.port,
+              database: database ?? config?.database,
+              user: user ?? config?.user,
+              password: password ?? config?.password,
+              serverSettings: serverSettings ?? config?.serverSettings,
+              tlsCA: tlsCA ?? config?.tlsCA,
+              tlsCAFile: tlsCAFile ?? config?.tlsCAFile,
+              tlsSecurity: tlsSecurity ?? config?.tlsSecurity,
+              waitUntilAvailable:
+                  waitUntilAvailable ?? config?.waitUntilAvailable),
           concurrency: concurrency),
       Options.defaults());
 }

@@ -21,7 +21,8 @@ class WriteBuffer {
 
   void _ensureAlloced(int extraLength) {
     if (pos + extraLength > buffer.buffer.lengthInBytes) {
-      final newBuffer = ByteData(buffer.buffer.lengthInBytes + bufferIncSize);
+      final newBuffer =
+          ByteData(buffer.buffer.lengthInBytes + extraLength + bufferIncSize);
       newBuffer.buffer.asUint8List().setRange(
           0, buffer.buffer.lengthInBytes, buffer.buffer.asUint8List());
       buffer = newBuffer;
@@ -33,8 +34,9 @@ class WriteBuffer {
   }
 
   void writeBuffer(Uint8List buf) {
-    buffer.buffer.asUint8List().setRange(pos, pos + buf.length, buf);
-    pos += buf.length;
+    _ensureAlloced(buf.lengthInBytes);
+    buffer.buffer.asUint8List().setRange(pos, pos + buf.lengthInBytes, buf);
+    pos += buf.lengthInBytes;
   }
 
   void writeBytes(List<int> bytes) {
