@@ -39,6 +39,9 @@ jobs:
       - name: Set up Dart
         uses: dart-lang/setup-dart@v1.3
 
+      - name: Install dependencies
+        run: dart pub get
+
       # - name: Lint
       #   run: |
       #     dart analyze
