@@ -6,7 +6,7 @@ import 'dart:math';
 import 'package:edgedb/edgedb.dart';
 import 'package:path/path.dart';
 
-void main() async {
+void main(List<String> testArgs) async {
   print('Starting EdgeDB test cluster...');
 
   final statusFile = await generateStatusFileName('dart');
@@ -20,8 +20,13 @@ void main() async {
 
   final adminConn = await setupServer(server.config);
 
-  final testProc = await Process.start('dart', ['test'],
-      environment: {'_DART_EDGEDB_CONNECT_CONFIG': jsonEncode(server.config)});
+  final testProc = await Process.start('dart', [
+    'test',
+    if (Platform.environment['GITHUB_ACTIONS'] != 'true') '--reporter=expanded',
+    ...testArgs
+  ], environment: {
+    '_DART_EDGEDB_CONNECT_CONFIG': jsonEncode(server.config)
+  });
 
   testProc.stdout.listen((event) => stdout.add(event));
   testProc.stderr.listen((event) => stderr.add(event));

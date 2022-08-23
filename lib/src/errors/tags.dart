@@ -1,4 +1,0 @@
-enum EdgeDBErrorTag {
-  shouldReconnect,
-  shouldRetry;
-}

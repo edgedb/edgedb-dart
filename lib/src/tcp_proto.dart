@@ -23,24 +23,33 @@ enum AuthenticationStatus {
 }
 
 class TCPProtocol extends BaseProtocol {
-  TCPProtocol({required super.transport, required super.codecsRegistry});
+  TCPProtocol(
+      {required super.transportCreator,
+      required super.codecsRegistry,
+      super.exposeErrorAttrs});
 
   static Future<TCPProtocol> create(
       {required ResolvedConnectConfig config,
       required CodecsRegistry registry,
-      Duration? timeout}) async {
+      Duration? timeout,
+      bool? exposeErrorAttrs}) async {
     final address = config.address;
     try {
       final sock = await SecureSocket.connect(address.host, address.port,
-          onBadCertificate: (certificate) => true,
-          supportedProtocols: ['edgedb-binary'],
+          onBadCertificate: config.verifyCert,
+          context: config.tlsOptions,
           timeout: timeout);
+      sock.setOption(SocketOption.tcpNoDelay, true);
+
+      if (sock.selectedProtocol != 'edgedb-binary') {
+        throw ClientConnectionFailedError(
+            "The server doesn't support the edgedb-binary protocol.");
+      }
 
       final conn = TCPProtocol(
-          transport: MessageTransport(sock, sock, onError: (e) {
-            throw e;
-          }),
-          codecsRegistry: registry);
+          transportCreator: transportCreator(sock, sock),
+          codecsRegistry: registry,
+          exposeErrorAttrs: exposeErrorAttrs);
 
       await conn._connectHandshake(
           database: config.database,
@@ -56,11 +65,29 @@ class TCPProtocol extends BaseProtocol {
         case 104: // ECONNRESET
         case -2: // ENOTFOUND (DNS name not found)
         case 2: // ENOENT (unix socket is not created yet)
-          throw ClientConnectionFailedTemporarilyError(e.message);
+          throw ClientConnectionFailedTemporarilyError(e.message, e);
         default:
+          throw ClientConnectionFailedError(e.message, e);
       }
-      rethrow;
     }
+  }
+
+  @override
+  Error onClose(ReadMessageBuffer? lastMessage) {
+    final err = ClientConnectionClosedError(
+        'the connection has been closed',
+        lastMessage?.messageType == MessageType.ErrorResponse
+            ? parseErrorMessage(lastMessage!)
+            : null);
+    abortWithError(err);
+    return err;
+  }
+
+  @override
+  Error onError(Object error) {
+    final err = ClientConnectionClosedError('network error: $error', error);
+    abortWithError(err);
+    return err;
   }
 
   Future<void> _connectHandshake(

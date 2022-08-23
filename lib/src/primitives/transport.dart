@@ -97,44 +97,84 @@ Stream<ReadMessageBuffer> createMessageStream(Stream<Uint8List> source) async* {
   }
 }
 
+typedef TransportCreator = MessageTransport Function(
+    {required Error Function(ReadMessageBuffer?) onClose,
+    required Error Function(Object) onError,
+    Map<MessageType, void Function(ReadMessageBuffer)>? asyncMessageHandlers});
+
+TransportCreator transportCreator(Stream<Uint8List> stream, IOSink sink) {
+  return (
+          {required Error Function(ReadMessageBuffer?) onClose,
+          required Error Function(Object) onError,
+          Map<MessageType, void Function(ReadMessageBuffer)>?
+              asyncMessageHandlers}) =>
+      MessageTransport(stream, sink,
+          onClose: onClose,
+          onError: onError,
+          asyncMessageHandlers: asyncMessageHandlers ?? {});
+}
+
 class MessageTransport {
   late StreamSubscription<ReadMessageBuffer> _sub;
   late IOSink _sink;
   Completer<ReadMessageBuffer>? _messageAwaiter;
+  bool _closed = false;
 
   MessageTransport(Stream<Uint8List> stream, IOSink sink,
-      {required Function(Object) onError}) {
+      {required Error Function(ReadMessageBuffer?) onClose,
+      required Error Function(Object) onError,
+      required Map<MessageType, void Function(ReadMessageBuffer)>
+          asyncMessageHandlers}) {
     _sink = sink;
     _sub = createMessageStream(stream).listen((message) {
       // print('got message: ${message.messageType.name}');
-      if (_messageAwaiter == null) {
-        throw StateError(
-            'received message from stream while not waiting for message');
+      if (asyncMessageHandlers.containsKey(message.messageType)) {
+        return asyncMessageHandlers[message.messageType]!(message);
       }
-      _sub.pause();
-      _messageAwaiter!.complete(message);
-      _messageAwaiter = null;
-    }, onDone: () => close(), onError: onError, cancelOnError: true);
-    _sub.pause();
+      if (_messageAwaiter != null) {
+        _messageAwaiter!.complete(message);
+        _messageAwaiter = null;
+      } else {
+        // received non-async message while not waiting for message
+        close();
+        onClose(message);
+      }
+    }, onDone: () async {
+      close();
+      if (_messageAwaiter != null) {
+        _messageAwaiter!.completeError(onClose(null));
+        _messageAwaiter = null;
+      } else {
+        onClose(null);
+      }
+    }, onError: (err) {
+      if (_messageAwaiter != null) {
+        _messageAwaiter!.completeError(onError(err));
+        _messageAwaiter = null;
+      } else {
+        onError(err);
+      }
+    }, cancelOnError: true);
   }
 
   Future<ReadMessageBuffer> takeMessage() {
     if (_messageAwaiter != null) {
-      return _messageAwaiter!.future;
+      throw InternalClientError('already waiting for message');
     }
     _messageAwaiter = Completer();
-    _sub.resume();
     return _messageAwaiter!.future;
   }
 
-  sendMessage(WriteMessageBuffer message) {
+  void sendMessage(WriteMessageBuffer message) {
     _sink.add(message.unwrap());
     // print(
     //     'sent message: ${clientMessageTypes[message.buffer.getUint8(0)]!.name}');
   }
 
-  Future<void> close() {
-    // print('closing');
-    return _sink.close();
+  Future<void> close() async {
+    if (!_closed) {
+      _closed = true;
+      return _sink.close();
+    }
   }
 }

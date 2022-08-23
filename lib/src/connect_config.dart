@@ -9,6 +9,8 @@ import 'package:path/path.dart';
 import 'credentials.dart';
 import 'errors/errors.dart';
 import 'platform.dart';
+import 'utils/env.dart';
+import 'utils/parse_duration.dart';
 
 class Address {
   String host;
@@ -77,11 +79,19 @@ class ConnectConfig {
         database = json['database'],
         user = json['user'],
         password = json['password'],
-        serverSettings = json['serverSettings'],
+        serverSettings = json['serverSettings'] != null
+            ? Map.castFrom(json['serverSettings'])
+            : null,
         tlsCA = json['tlsCA'],
         tlsCAFile = json['tlsCAFile'],
-        tlsSecurity = tlsSecurityValues[json['tlsSecurity']],
-        waitUntilAvailable = json['waitUntilAvailable'];
+        tlsSecurity = json['tlsSecurity'] != null
+            ? tlsSecurityValues[json['tlsSecurity']] ??
+                (throw InterfaceError(
+                    "invalid tlsSecurity value: '${json['tlsSecurity']}'"))
+            : null,
+        waitUntilAvailable = json['waitUntilAvailable'] != null
+            ? Duration(milliseconds: json['waitUntilAvailable'])
+            : null;
 
   Map<String, dynamic> toJson() {
     return {
@@ -98,7 +108,7 @@ class ConnectConfig {
       'tlsCA': tlsCA,
       'tlsCAFile': tlsCAFile,
       'tlsSecurity': tlsSecurity,
-      'waitUntilAvailable': waitUntilAvailable,
+      'waitUntilAvailable': waitUntilAvailable?.inMilliseconds,
     };
   }
 }
@@ -112,6 +122,14 @@ class SourcedValue<T> {
   SourcedValue.from(SourcedValue val)
       : value = val.value as T,
         source = val.source;
+}
+
+TLSSecurity? debugGetRawTlsSecurity(ResolvedConnectConfig config) {
+  return config._tlsSecurity?.value;
+}
+
+String? debugGetRawCAData(ResolvedConnectConfig config) {
+  return config._tlsCAData?.value;
 }
 
 class ResolvedConnectConfig {
@@ -170,8 +188,13 @@ class ResolvedConnectConfig {
 
   Future<void> setTlsCAFile(SourcedValue<String?> caFile) async {
     if (_tlsCAData == null && caFile.value != null) {
-      _tlsCAData =
-          SourcedValue(await File(caFile.value!).readAsString(), caFile.source);
+      try {
+        _tlsCAData = SourcedValue(
+            await File(caFile.value!).readAsString(), caFile.source);
+      } on FileSystemException catch (e) {
+        throw InterfaceError(
+            "cannot open file '${caFile.value}' specified by '${caFile.source}' ($e)");
+      }
     }
   }
 
@@ -192,7 +215,7 @@ class ResolvedConnectConfig {
             'invalid tlsSecurity value, must be of type TLSSecurity');
       }
       final origTlsSec = tlsSec;
-      final clientSecurity = Platform.environment['EDGEDB_CLIENT_SECURITY'];
+      final clientSecurity = getEnvVar('EDGEDB_CLIENT_SECURITY');
       if (clientSecurity != null) {
         if (!{'default', 'insecure_dev_mode', 'strict'}
             .contains(clientSecurity)) {
@@ -253,6 +276,48 @@ class ResolvedConnectConfig {
     return _password?.value;
   }
 
+  TLSSecurity get tlsSecurity {
+    return _tlsSecurity != null &&
+            _tlsSecurity!.value != TLSSecurity.defaultSecurity
+        ? _tlsSecurity!.value
+        : _tlsCAData != null
+            ? TLSSecurity.noHostVerification
+            : TLSSecurity.strict;
+  }
+
+  SecurityContext? _tlsOptions;
+  SecurityContext get tlsOptions {
+    if (_tlsOptions != null) {
+      return _tlsOptions!;
+    }
+
+    final context = SecurityContext(withTrustedRoots: _tlsCAData == null);
+    _tlsOptions = context;
+
+    context.setAlpnProtocols(['edgedb-binary'], false);
+
+    if (_tlsCAData != null) {
+      context.setTrustedCertificatesBytes(utf8.encode(_tlsCAData!.value));
+    }
+
+    return context;
+  }
+
+  bool verifyCert(X509Certificate cert) {
+    // We need to be able to both completely override the cert validity check
+    // for 'insecure' mode, and check a cert is valid with the exception
+    // of the server hostname for 'no_host_verification' mode.
+    // The 'SecureSocket' api has a single 'onBadCertificate' handler, which
+    // only provides the cert without the reason it's considered 'bad'. Since
+    // there seems to be no way to otherwise manually validate the cert, in
+    // 'no_host_verification' mode, we just assume the cert is valid (ignoring
+    // for the hostname), if the cert's pem data matches the 'tlsCAData' value.
+    return (tlsSecurity == TLSSecurity.insecure ||
+        (tlsSecurity == TLSSecurity.noHostVerification &&
+            _tlsCAData != null &&
+            cert.pem == _tlsCAData!.value));
+  }
+
   int get waitUntilAvailable {
     return _waitUntilAvailable?.value ?? 30000;
   }
@@ -268,7 +333,7 @@ Future<String> stashPath(String projectDir) async {
   final baseName = basename(projectPath);
   final dirName = '$baseName-$hash';
 
-  return searchConfigDir(join('projects', dirName));
+  return join('projects', dirName);
 }
 
 final Map<String, String?> projectDirCache = {};
@@ -331,8 +396,12 @@ int parseDuration(dynamic rawDuration) {
     duration = rawDuration;
   } else if (rawDuration is Duration) {
     duration = rawDuration.inMilliseconds;
+  } else if (rawDuration is String) {
+    duration = (rawDuration.startsWith('P')
+            ? parseISODurationString(rawDuration)
+            : parseHumanDurationString(rawDuration))
+        .inMilliseconds;
   } else {
-    // TODO: parse string durations
     throw InterfaceError('invalid duration, expected int or Duration');
   }
   if (duration < 0) {
@@ -383,7 +452,7 @@ Future<ResolvedConnectConfig> parseConnectConfig(ConnectConfig config) async {
   if (!hasCompoundOptions) {
     // resolve config from env vars
 
-    var port = Platform.environment['EDGEDB_PORT'];
+    var port = getEnvVar('EDGEDB_PORT');
     if (resolvedConfig._port == null &&
         port != null &&
         port.startsWith('tcp://')) {
@@ -392,36 +461,35 @@ Future<ResolvedConnectConfig> parseConnectConfig(ConnectConfig config) async {
       port = null;
     }
 
-    final env = Platform.environment;
     hasCompoundOptions = await resolveConfigOptions(
       resolvedConfig,
       "Cannot have more than one of the following connection environment variables: "
       "'EDGEDB_DSN', 'EDGEDB_INSTANCE', 'EDGEDB_CREDENTIALS', "
       "'EDGEDB_CREDENTIALS_FILE' or 'EDGEDB_HOST'",
-      dsn: SourcedValue(env['EDGEDB_DSN'], "'EDGEDB_DSN' environment variable"),
-      instanceName: SourcedValue(
-          env['EDGEDB_INSTANCE'], "'EDGEDB_INSTANCE' environment variable"),
-      credentials: SourcedValue(env['EDGEDB_CREDENTIALS'],
+      dsn: SourcedValue(
+          getEnvVar('EDGEDB_DSN'), "'EDGEDB_DSN' environment variable"),
+      instanceName: SourcedValue(getEnvVar('EDGEDB_INSTANCE'),
+          "'EDGEDB_INSTANCE' environment variable"),
+      credentials: SourcedValue(getEnvVar('EDGEDB_CREDENTIALS'),
           "'EDGEDB_CREDENTIALS' environment variable"),
-      credentialsFile: SourcedValue(env['EDGEDB_CREDENTIALS_FILE'],
+      credentialsFile: SourcedValue(getEnvVar('EDGEDB_CREDENTIALS_FILE'),
           "'EDGEDB_CREDENTIALS_FILE' environment variable"),
       host: SourcedValue(
-          env['EDGEDB_HOST'], "'EDGEDB_HOST' environment variable"),
-      port: SourcedValue(
-          env['EDGEDB_PORT'], "'EDGEDB_PORT' environment variable"),
-      database: SourcedValue(
-          env['EDGEDB_DATABASE'], "'EDGEDB_DATABASE' environment variable"),
+          getEnvVar('EDGEDB_HOST'), "'EDGEDB_HOST' environment variable"),
+      port: SourcedValue(port, "'EDGEDB_PORT' environment variable"),
+      database: SourcedValue(getEnvVar('EDGEDB_DATABASE'),
+          "'EDGEDB_DATABASE' environment variable"),
       user: SourcedValue(
-          env['EDGEDB_USER'], "'EDGEDB_USER' environment variable"),
-      password: SourcedValue(
-          env['EDGEDB_PASSWORD'], "'EDGEDB_PASSWORD' environment variable"),
+          getEnvVar('EDGEDB_USER'), "'EDGEDB_USER' environment variable"),
+      password: SourcedValue(getEnvVar('EDGEDB_PASSWORD'),
+          "'EDGEDB_PASSWORD' environment variable"),
       tlsCA: SourcedValue(
-          env['EDGEDB_TLS_CA'], "'EDGEDB_TLS_CA' environment variable"),
-      tlsCAFile: SourcedValue(env['EDGEDB_TLS_CA_FILE'],
+          getEnvVar('EDGEDB_TLS_CA'), "'EDGEDB_TLS_CA' environment variable"),
+      tlsCAFile: SourcedValue(getEnvVar('EDGEDB_TLS_CA_FILE'),
           "'EDGEDB_TLS_CA_FILE' environment variable"),
-      tlsSecurity: SourcedValue(env['EDGEDB_TLS_SECURITY'],
-          "'EDGEDB_TLS_SECURITY' environment variable"),
-      waitUntilAvailable: SourcedValue(env['EDGEDB_WAIT_UNTIL_AVAILABLE'],
+      tlsSecurity: SourcedValue(getEnvVar('EDGEDB_CLIENT_TLS_SECURITY'),
+          "'EDGEDB_CLIENT_TLS_SECURITY' environment variable"),
+      waitUntilAvailable: SourcedValue(getEnvVar('EDGEDB_WAIT_UNTIL_AVAILABLE'),
           "'EDGEDB_WAIT_UNTIL_AVAILABLE' environment variable"),
     );
   }
@@ -436,9 +504,9 @@ Future<ResolvedConnectConfig> parseConnectConfig(ConnectConfig config) async {
           " variables EDGEDB_HOST, EDGEDB_INSTANCE, EDGEDB_DSN, "
           "EDGEDB_CREDENTIALS or EDGEDB_CREDENTIALS_FILE");
     }
-    final stashDir = await stashPath(projectDir);
-    final instName =
-        (await readFileOrNull(join(stashDir, 'instance-name')))?.trim();
+    final instancePath = await searchConfigDir(
+        join(await stashPath(projectDir), 'instance-name'));
+    final instName = (await readFileOrNull(instancePath))?.trim();
 
     if (instName != null) {
       await resolveConfigOptions(resolvedConfig, '',
@@ -532,7 +600,7 @@ Future<bool> resolveConfigOptions(
         creds = validateCredentials(json.decode(credentials!.value!));
         source = credentials.source;
       } else {
-        var credsFile = credentials?.value;
+        var credsFile = credentialsFile?.value;
         if (credsFile == null) {
           if (!RegExp(r'^[A-Za-z_][A-Za-z_0-9]*$')
               .hasMatch(instanceName!.value!)) {
@@ -565,7 +633,7 @@ Future<void> parseDSNIntoConfig(
     ResolvedConnectConfig config, SourcedValue<String> dsnString) async {
   final parsed = Uri.tryParse(dsnString.value);
   if (parsed == null) {
-    throw InterfaceError("invalud DSN or instance name: '${dsnString.value}'");
+    throw InterfaceError("invalid DSN or instance name: '${dsnString.value}'");
   }
 
   if (!parsed.isScheme('edgedb')) {
@@ -608,7 +676,7 @@ Future<void> parseDSNIntoConfig(
       if (param == null) {
         final env = searchParams['${paramName}_env'];
         if (env != null) {
-          param = Platform.environment[env];
+          param = getEnvVar(env);
           if (param == null) {
             throw InterfaceError(
                 "'${paramName}_env' environment variable '$env' doesn't exist");
@@ -619,7 +687,12 @@ Future<void> parseDSNIntoConfig(
       if (param == null) {
         final file = searchParams['${paramName}_file'];
         if (file != null) {
-          param = await File(file).readAsString();
+          try {
+            param = await File(file).readAsString();
+          } on FileSystemException catch (e) {
+            throw InterfaceError(
+                "cannot open file '$file' specified by '${paramName}_file' ($e)");
+          }
           paramSource += ' (${paramName}_file: $file)';
         }
       }
@@ -636,8 +709,11 @@ Future<void> parseDSNIntoConfig(
     searchParams.remove('${paramName}_file');
   }
 
-  await handleDSNPart('host', parsed.host.isNotEmpty ? parsed.host : null,
-      config._host, (host) => config.setHost(SourcedValue.from(host)));
+  await handleDSNPart(
+      'host',
+      parsed.host.isNotEmpty ? parsed.host.replaceAll('%25', '%') : null,
+      config._host,
+      (host) => config.setHost(SourcedValue.from(host)));
 
   await handleDSNPart('port', parsed.hasPort ? parsed.port : null, config._port,
       config.setPort);

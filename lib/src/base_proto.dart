@@ -1,11 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:typed_data';
 
 import 'codecs/codecs.dart';
-import 'codecs/object.dart';
 import 'codecs/registry.dart';
 import 'connect_config.dart';
+import 'errors/base.dart';
 import 'errors/errors.dart';
 import 'errors/resolve.dart';
 import 'options.dart';
@@ -55,7 +56,8 @@ typedef CreateConnection<Connection extends BaseProtocol>
     = Future<Connection> Function(
         {required ResolvedConnectConfig config,
         required CodecsRegistry registry,
-        Duration? timeout});
+        Duration? timeout,
+        bool? exposeErrorAttrs});
 
 class ParseResult {
   final Cardinality cardinality;
@@ -97,41 +99,89 @@ abstract class BaseProtocol {
   TransactionStatus transactionStatus = TransactionStatus.idle;
   String? lastStatus;
   ProtocolVersion protocolVersion = protoVer;
+  bool exposeErrorAttrs;
   final serverSettings = ServerSettings();
-  final MessageTransport transport;
+  late final MessageTransport transport;
   final CodecsRegistry codecsRegistry;
   final queryCodecCache = LRU<int, ParseResult>(capacity: 1000);
   Codec stateCodec = invalidCodec;
   StateCache? stateCache;
   bool connected = false;
+  final Completer<Error> connAbortWaiter = Completer();
+  Error? _abortedWithError;
 
-  BaseProtocol({required this.transport, required this.codecsRegistry});
+  BaseProtocol(
+      {required TransportCreator transportCreator,
+      required this.codecsRegistry,
+      bool? exposeErrorAttrs})
+      : exposeErrorAttrs = exposeErrorAttrs ?? false {
+    transport = transportCreator(
+        onClose: onClose,
+        onError: onError,
+        asyncMessageHandlers: {
+          MessageType.ParameterStatus: _parseServerSettings,
+          MessageType.LogMessage: _parseLogMessage,
+        });
+  }
+
+  // connection state handling
 
   bool get isClosed {
     return !connected;
   }
 
+  Error onClose(ReadMessageBuffer? lastMessage);
+
+  Error onError(Object error);
+
+  Future<void> _abort() async {
+    if (connected) {
+      connected = false;
+      if (!connAbortWaiter.isCompleted) {
+        connAbortWaiter.complete(
+            _abortedWithError ?? InterfaceError('connection has been closed'));
+      }
+      return transport.close();
+    }
+  }
+
+  void abortWithError(Error err) {
+    _abortedWithError = err;
+    _abort();
+  }
+
   Future<void> close() async {
-    return transport.close();
+    if (connected) {
+      transport.sendMessage(
+          WriteMessageBuffer(ClientMessageType.Terminate)..endMessage());
+    }
+    return _abort();
+  }
+
+  Future<void> resetState() async {
+    if (connected && transactionStatus != TransactionStatus.idle) {
+      try {
+        await fetch(
+            query: 'rollback',
+            outputFormat: OutputFormat.none,
+            expectedCardinality: Cardinality.noResult,
+            state: Session.defaults(),
+            privilegedMode: true);
+      } catch (e) {
+        abortWithError(ClientConnectionClosedError('failed to reset state'));
+      }
+    }
+  }
+
+  void _checkState() {
+    if (!connected) {
+      throw _abortedWithError ?? InterfaceError('connection has been closed');
+    }
   }
 
   // message parsers
 
   void fallthrough(ReadMessageBuffer message) {
-    if (message.messageType == MessageType.ParameterStatus) {
-      return _parseServerSettings(message);
-    }
-    if (message.messageType == MessageType.LogMessage) {
-      final severity = message.readUint8();
-      final code = message.readUint32();
-      final logMessage = message.readString();
-      message
-        ..ignoreHeaders()
-        ..finishMessage();
-      print('SERVER MESSAGE | $severity $code | $logMessage');
-      return;
-    }
-
     throw ProtocolError('unexpected "${message.messageType.name}" message '
         '("${ascii.decode([message.messageType.value])}")');
   }
@@ -141,6 +191,16 @@ abstract class BaseProtocol {
     final status = message.readUint8();
     transactionStatus =
         transactionStatuses[status] ?? TransactionStatus.unknown;
+  }
+
+  void _parseLogMessage(ReadMessageBuffer message) {
+    final severity = message.readUint8();
+    final code = message.readUint32();
+    final logMessage = message.readString();
+    message
+      ..ignoreHeaders()
+      ..finishMessage();
+    print('SERVER MESSAGE | $severity $code | $logMessage');
   }
 
   void _parseServerSettings(ReadMessageBuffer message) {
@@ -186,9 +246,14 @@ abstract class BaseProtocol {
     final errorType = resolveErrorCode(errCode);
     final err = errorType(errMessage);
 
-    message
-      ..ignoreHeaders()
-      ..finishMessage();
+    if (exposeErrorAttrs) {
+      final attrs = message.readHeaders().map((key, value) => MapEntry(
+          errorAttrsByCode[key] ?? ErrorAttr.unknown, utf8.decode(value)));
+      setErrorAttrs(err, attrs);
+    } else {
+      message.ignoreHeaders();
+    }
+    message.finishMessage();
 
     if (err is AuthenticationError) {
       throw err;
@@ -331,8 +396,6 @@ abstract class BaseProtocol {
       Codec? inCodec,
       Codec? outCodec,
       bool privilegedMode = false}) async {
-    // this._checkState();
-
     final requiredOne = expectedCardinality == Cardinality.one;
     final expectOne =
         requiredOne || expectedCardinality == Cardinality.atMostOne;
@@ -418,6 +481,8 @@ abstract class BaseProtocol {
     required bool privilegedMode,
     // options
   }) async {
+    _checkState();
+
     final wb = WriteMessageBuffer(ClientMessageType.Parse)
       ..writeUint16(0); // no headers
 
@@ -507,6 +572,8 @@ abstract class BaseProtocol {
     required List<dynamic> result,
     // options?: ParseOptions
   }) async {
+    _checkState();
+
     final wb = WriteMessageBuffer(ClientMessageType.Execute)
       ..writeUint16(0); // no headers
 

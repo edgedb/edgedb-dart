@@ -2,14 +2,14 @@ import 'dart:io';
 
 import 'package:path/path.dart';
 
+import 'utils/env.dart';
+
 String homeDir() {
-  final homeDir =
-      Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+  final homeDir = getEnvVar('HOME') ?? getEnvVar('USERPROFILE');
   if (homeDir != null) {
     return homeDir;
   }
-  final homeDrive = Platform.environment['HOMEDRIVE'],
-      homePath = Platform.environment['HOMEPATH'];
+  final homeDrive = getEnvVar('HOMEDRIVE'), homePath = getEnvVar('HOMEPATH');
   if (homeDrive != null && homePath != null) {
     return join(homeDrive, homePath);
   }
@@ -22,12 +22,12 @@ final _configDir = Platform.isMacOS
       }
     : (Platform.isWindows
         ? () {
-            final localAppDataDir = Platform.environment['LOCALAPPDATA'] ??
+            final localAppDataDir = getEnvVar('LOCALAPPDATA') ??
                 join(homeDir(), 'AppData', 'Local');
             return join(localAppDataDir, 'EdgeDB', 'config');
           }
         : () {
-            var xdgConfigDir = Platform.environment['XDG_CONFIG_HOME'];
+            var xdgConfigDir = getEnvVar('XDG_CONFIG_HOME');
             if (xdgConfigDir == null || !Directory(xdgConfigDir).isAbsolute) {
               xdgConfigDir = join(homeDir(), '.config');
             }
@@ -38,12 +38,12 @@ final _configDir = Platform.isMacOS
 Future<String> searchConfigDir(configPath) async {
   final filePath = join(_configDir(), configPath);
 
-  if (await Directory(filePath).exists()) {
+  if (await File(filePath).exists()) {
     return filePath;
   }
 
   final fallbackPath = join(homeDir(), '.edgedb', configPath);
-  if (await Directory(fallbackPath).exists()) {
+  if (await File(fallbackPath).exists()) {
     return fallbackPath;
   }
 

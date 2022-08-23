@@ -16,10 +16,8 @@ main() async {
     ..writeln('// ignore_for_file: overridden_fields')
     ..writeln()
     ..writeln('import \'base.dart\';')
-    ..writeln('import \'tags.dart\';')
     ..writeln()
-    ..writeln('export \'base.dart\';')
-    ..writeln('export \'tags.dart\';')
+    ..writeln('export \'base.dart\' show EdgeDBError, EdgeDBErrorTag;')
     ..writeln();
 
   final mappingBuf = StringBuffer();
@@ -40,7 +38,7 @@ main() async {
 
     errorsBuf
       ..writeln('class ${err[0]} extends $base {')
-      ..writeln('  ${err[0]}(super.message);')
+      ..writeln('  ${err[0]}(super.message, [super.source]);')
       ..writeln()
       ..writeln('  ${err[1] != null ? '@override ' : ''}final code = $code;');
 
