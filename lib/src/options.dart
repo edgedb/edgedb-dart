@@ -28,8 +28,9 @@ class RetryOptions {
   final RetryRule defaultRetryRule;
   final Map<RetryCondition, RetryRule> _overrides;
 
-  RetryOptions({int attempts = 3, BackoffFunction backoff = defaultBackoff})
-      : defaultRetryRule = RetryRule(attempts: attempts, backoff: backoff),
+  RetryOptions({int? attempts, BackoffFunction? backoff})
+      : defaultRetryRule = RetryRule(
+            attempts: attempts ?? 3, backoff: backoff ?? defaultBackoff),
         _overrides = Map.unmodifiable({});
 
   RetryOptions._cloneWithOverrides(
@@ -68,11 +69,11 @@ class TransactionOptions {
   final bool readonly;
   final bool deferrable;
 
-  TransactionOptions({
-    this.isolation = IsolationLevel.serializable,
-    this.readonly = false,
-    this.deferrable = false,
-  });
+  TransactionOptions(
+      {IsolationLevel? isolation, bool? readonly, bool? deferrable})
+      : isolation = isolation ?? IsolationLevel.serializable,
+        readonly = readonly ?? false,
+        deferrable = deferrable ?? false;
 
   static TransactionOptions defaults() {
     return TransactionOptions();
@@ -83,13 +84,13 @@ class Session {
   final String module;
   final Map<String, String> moduleAliases;
   final Map<String, Object> config;
-  final Map<String, Object> globals;
+  final Map<String, dynamic> globals;
 
   Session({
     this.module = 'default',
     Map<String, String>? moduleAliases,
     Map<String, Object>? config,
-    Map<String, Object>? globals,
+    Map<String, dynamic>? globals,
   })  : moduleAliases = Map.unmodifiable(moduleAliases ?? {}),
         config = Map.unmodifiable(config ?? {}),
         globals = Map.unmodifiable(globals ?? {});
@@ -110,7 +111,7 @@ class Session {
         globals: globals);
   }
 
-  Session withGlobals(Map<String, Object> globals) {
+  Session withGlobals(Map<String, dynamic> globals) {
     return Session(
         globals: {...this.globals, ...globals},
         module: module,

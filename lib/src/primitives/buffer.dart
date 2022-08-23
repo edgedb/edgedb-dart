@@ -277,10 +277,21 @@ class ReadMessageBuffer extends ReadBuffer {
   void ignoreHeaders() {
     var numFields = readInt16();
     while (numFields > 0) {
-      readInt16();
+      discard(2);
       discard(readInt32());
       numFields--;
     }
+  }
+
+  Map<int, Uint8List> readHeaders() {
+    var numFields = readInt16();
+    final headers = <int, Uint8List>{};
+    while (numFields > 0) {
+      final key = readUint16();
+      headers[key] = readLenPrefixedBytes();
+      numFields--;
+    }
+    return headers;
   }
 
   void finishMessage() {

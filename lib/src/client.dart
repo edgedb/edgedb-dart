@@ -75,7 +75,7 @@ class ClientConnectionHolder<Connection extends BaseProtocol> {
 
     _options = null;
 
-    // await this._connection?.resetState();
+    await _connection?.resetState();
 
     if (!_inUse!.isCompleted) {
       _inUse!.complete();
@@ -106,7 +106,7 @@ class ClientConnectionHolder<Connection extends BaseProtocol> {
       try {
         result = await Future.any([
           action(transaction),
-          // transaction._waitForConnAbort(),
+          transaction._waitForConnAbort(),
         ]);
         try {
           await transaction._commit();
@@ -250,14 +250,17 @@ class ClientPool<Connection extends BaseProtocol> {
   final ConnectConfig _connectConfig;
   Future<ResolvedConnectConfig>? _resolvedConnectConfig;
   final _codecsRegistry = CodecsRegistry();
+  bool? _exposeErrorAttrs;
 
-  ClientPool(this._createConnection, this._connectConfig, {int? concurrency}) {
+  ClientPool(this._createConnection, this._connectConfig,
+      {int? concurrency, bool? exposeErrorAttrs}) {
     if (concurrency != null && concurrency <= 0) {
       throw InterfaceError(
           "invalid 'concurrency' value: expected int greater than 0 (got $concurrency)");
     }
 
     _userConcurrency = concurrency;
+    _exposeErrorAttrs = exposeErrorAttrs;
 
     _resizeHolderPool();
   }
@@ -318,8 +321,8 @@ class ClientPool<Connection extends BaseProtocol> {
 
     final config =
         await (_resolvedConnectConfig ??= parseConnectConfig(_connectConfig));
-    final connection =
-        await retryingConnect(_createConnection, config, _codecsRegistry);
+    final connection = await retryingConnect(
+        _createConnection, config, _codecsRegistry, _exposeErrorAttrs);
 
     final suggestedConcurrency =
         connection.serverSettings.suggestedPoolConcurrency;
@@ -469,7 +472,7 @@ class Client implements Executor {
         _pool, _options.withSession(_options.session.withConfig(config)));
   }
 
-  Client withGlobals(Map<String, Object> globals) {
+  Client withGlobals(Map<String, dynamic> globals) {
     return Client._create(
         _pool, _options.withSession(_options.session.withGlobals(globals)));
   }

@@ -335,10 +335,36 @@ void main() {
       "fetch: relative_duration",
       () async {});
 
-  test(
-      skip: 'ConfigMemory type unimplemented',
-      "fetch: ConfigMemory",
-      () async {});
+  test("fetch: ConfigMemory", () async {
+    final client = getClient();
+
+    try {
+      for (var memStr in [
+        "0B",
+        "0GiB",
+        "1024MiB",
+        "9223372036854775807B",
+        "123KiB",
+        "9MiB",
+        "102938GiB",
+        "108TiB",
+        "42PiB",
+      ]) {
+        final res = await client.querySingle(r'''
+          select (
+            <cfg::memory><str>$mem,
+            <str><cfg::memory><str>$mem,
+          );''', {'mem': memStr});
+        expect(res[0].toString(), res[1]);
+
+        final res2 = await client
+            .querySingle(r'select <cfg::memory>$mem;', {'mem': res[0]});
+        expect(res2.toString(), res[0].toString());
+      }
+    } finally {
+      await client.close();
+    }
+  });
 
   test(skip: 'range type unimplemented', "fetch: ranges", () async {});
 
@@ -670,10 +696,191 @@ void main() {
       queryRequiredSingleJSONTests,
     ]) {
       await tests(client);
-      // TODO: fix errors in transactions
-      // await client.transaction((tx) => tests(tx));
+      try {
+        await client.transaction((tx) => tests(tx));
+      } catch (e) {
+        //
+      }
     }
 
     client.close();
+  });
+
+  test("transaction state cleanup", () async {
+    // concurrency 1 to ensure we reuse the underlying connection
+    final client = getClient(concurrency: 1);
+
+    await expectLater(client.transaction((tx) async {
+      try {
+        await tx.query('select 1/0');
+      } catch (e) {
+        // catch the error in the transaction so `transaction` method doesn't
+        // attempt rollback
+      }
+    }),
+        throwsA(isA<EdgeDBError>().having((e) => e.message, 'message',
+            contains('current transaction is aborted'))));
+
+    expect(await client.querySingle('select "success"'), 'success');
+
+    client.close();
+  });
+
+  test("execute", () async {
+    final client = getClient();
+    try {
+      await expectLater(
+          client.execute('select 1/0;'),
+          throwsA(isA<DivisionByZeroError>()
+              .having((e) => e.code, 'error code', 0x05010001)
+              .having(
+                  (e) => e.message, 'message', contains('division by zero'))));
+    } finally {
+      await client.close();
+    }
+  });
+
+  test("scripts and args", () async {
+    final client = getClient();
+
+    await client.execute('''create type ScriptTest {
+    create property name -> str;
+  };''');
+
+    try {
+      await expectLater(client.execute('''
+          insert ScriptTest {
+            name := 'test'
+          }''', {'name': "test"}), throwsA(isA<QueryArgumentError>()));
+
+      await client.execute('''
+          select 1 + 2;
+
+          insert ScriptTest {
+            name := 'test0'
+          };''');
+
+      expect(await client.query('select ScriptTest {name}'), [
+        {'name': "test0"},
+      ]);
+
+      await expectLater(client.execute(r'''
+          insert ScriptTest {
+            name := <str>$name
+          };
+
+          insert ScriptTest {
+            name := 'test' ++ <str>count(detached ScriptTest)
+          };'''), throwsA(isA<QueryArgumentError>()));
+
+      await client.execute(r'''
+          insert ScriptTest {
+            name := <str>$name
+          };
+
+          insert ScriptTest {
+            name := 'test' ++ <str>count(detached ScriptTest)
+          };''', {'name': "test1"});
+
+      expect(await client.query('select ScriptTest {name}'), [
+        {'name': "test0"},
+        {'name': "test1"},
+        {'name': "test2"},
+      ]);
+
+      expect(await client.query(r'''
+          insert ScriptTest {
+            name := <str>$name
+          };
+
+          insert ScriptTest {
+            name := 'test' ++ <str>count(detached ScriptTest)
+          };
+
+          select ScriptTest.name;''', {'name': "test3"}),
+          ["test0", "test1", "test2", "test3", "test4"]);
+    } finally {
+      await client.execute('drop type ScriptTest;');
+      client.close();
+    }
+  });
+
+  test("fetch/optimistic cache invalidation", () async {
+    const typename = "CacheInv_01";
+    const query = 'SELECT $typename.prop1 LIMIT 1';
+    final client = getClient();
+
+    try {
+      await client.transaction((tx) async {
+        await tx.execute('''
+        CREATE TYPE $typename {
+          CREATE REQUIRED PROPERTY prop1 -> std::str;
+        };
+
+        INSERT $typename {
+          prop1 := 'aaa'
+        };
+      ''');
+
+        for (var i = 0; i < 5; i++) {
+          expect(await tx.querySingle(query), 'aaa');
+        }
+
+        await tx.execute('''
+        DELETE (SELECT $typename);
+
+        ALTER TYPE $typename {
+          DROP PROPERTY prop1;
+        };
+
+        ALTER TYPE $typename {
+          CREATE REQUIRED PROPERTY prop1 -> std::int64;
+        };
+
+        INSERT $typename {
+          prop1 := 123
+        };
+      ''');
+
+        for (var i = 0; i < 5; i++) {
+          expect(await tx.querySingle(query), 123);
+        }
+
+        throw CancelTransaction();
+      });
+    } on CancelTransaction {
+      //
+    } finally {
+      await client.close();
+    }
+  });
+
+  test("fetch no codec", () async {
+    final client = getClient();
+    try {
+      await expectLater(
+          client.querySingle("select <decimal>1"),
+          throwsA(isA<EdgeDBError>().having((e) => e.message, 'message',
+              contains('no Dart codec for std::decimal'))));
+
+      expect(await client.querySingle("select 123"), 123);
+    } finally {
+      await client.close();
+    }
+  });
+
+  test("concurrent ops", () async {
+    final client = getClient();
+
+    try {
+      expect(
+          await Future.wait([
+            client.querySingle('SELECT 1 + 2'),
+            client.querySingle('SELECT 2 + 2')
+          ]),
+          [3, 4]);
+    } finally {
+      await client.close();
+    }
   });
 }

@@ -8,12 +8,16 @@ import 'errors/errors.dart';
 Future<Connection> retryingConnect<Connection extends BaseProtocol>(
     CreateConnection<Connection> createConnection,
     ResolvedConnectConfig config,
-    CodecsRegistry registry) async {
+    CodecsRegistry registry,
+    bool? exposeErrorAttrs) async {
   final waitMilliseconds = config.waitUntilAvailable;
   final timeout = Stopwatch()..start();
   while (true) {
     try {
-      return await createConnection(config: config, registry: registry);
+      return await createConnection(
+          config: config,
+          registry: registry,
+          exposeErrorAttrs: exposeErrorAttrs);
     } on ClientConnectionError catch (e) {
       if (timeout.elapsedMilliseconds < waitMilliseconds &&
           e.hasTag(EdgeDBErrorTag.shouldReconnect)) {

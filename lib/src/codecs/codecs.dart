@@ -7,6 +7,7 @@ import 'bytes.dart';
 import 'consts.dart';
 import 'datetime.dart';
 import 'json.dart';
+import 'memory.dart';
 import 'numbers.dart';
 import 'numerics.dart';
 import 'text.dart';
@@ -88,7 +89,7 @@ final _scalarCodecConstructors = {
   // 'cal::local_datetime': LocalDateTimeCodec.new,
   // 'cal::relative_duration': RelativeDurationCodec.new,
   // 'cal::date_duration': DateDurationCodec.new,
-  // 'cfg::memory': ConfigMemoryCodec.new,
+  'cfg::memory': ConfigMemoryCodec.new,
 }.map<String, ScalarCodec Function(String)>((typename, type) {
   final id = knownTypeNames[typename];
   if (id == null) {

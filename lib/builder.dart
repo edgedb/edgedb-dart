@@ -5,10 +5,11 @@ import 'package:edgedb/src/base_proto.dart';
 import 'package:edgedb/src/client.dart';
 import 'package:edgedb/src/codecs/codecs.dart';
 import 'package:edgedb/src/connect_config.dart';
-import 'package:edgedb/src/errors/errors.dart';
+import 'package:edgedb/src/errors/base.dart';
 import 'package:edgedb/src/options.dart';
 import 'package:edgedb/src/primitives/types.dart';
 import 'package:edgedb/src/tcp_proto.dart';
+import 'package:edgedb/src/utils/pretty_print_error.dart';
 import 'package:path/path.dart';
 
 Builder edgeDBBuilder(BuilderOptions options) =>
@@ -42,6 +43,8 @@ class EdgeDBBuilder implements Builder {
           expectedCardinality: Cardinality.many,
           state: Session.defaults(),
           privilegedMode: false);
+    } on EdgeDBError catch (err) {
+      throw prettyPrintError(err, query);
     } finally {
       await holder.release();
     }
@@ -288,6 +291,6 @@ WalkCodecReturn walkCodec(Codec codec, Cardinality card,
 ClientPool? _connPool;
 final connPoolResource = Resource(() async {
   return _connPool ??= ClientPool(TCPProtocol.create,
-      ConnectConfig(host: 'localhost', database: '_example'),
-      concurrency: 5);
+      ConnectConfig(instanceName: '_localdev', database: '_example'),
+      concurrency: 5, exposeErrorAttrs: true);
 }, beforeExit: () => _connPool?.close());

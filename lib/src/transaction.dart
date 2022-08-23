@@ -71,19 +71,16 @@ class Transaction<Connection extends BaseProtocol> implements Executor {
     }, "A query is still in progress after transaction block has returned.");
   }
 
-  // Future<void> _waitForConnAbort() {
-  //   await this._rawConn.connAbortWaiter.wait();
+  Future<T> _waitForConnAbort<T>() async {
+    final abortError = await _conn.connAbortWaiter.future;
 
-  //   const abortError = this._rawConn.getConnAbortError();
-  //   if (
-  //     abortError instanceof errors.EdgeDBError &&
-  //     abortError.source instanceof errors.TransactionTimeoutError
-  //   ) {
-  //     throw abortError.source;
-  //   } else {
-  //     throw abortError;
-  //   }
-  // }
+    if (abortError is EdgeDBError &&
+        abortError.source is TransactionTimeoutError) {
+      throw abortError.source!;
+    } else {
+      throw abortError;
+    }
+  }
 
   Future<T> _runOp<T>(String opname, Future<T> Function() op,
       [String? errMessage]) async {
