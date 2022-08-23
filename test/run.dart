@@ -40,6 +40,8 @@ void main(List<String> testArgs) async {
   } finally {
     print('...EdgeDB test cluster is down');
   }
+
+  File(statusFile.path).delete().ignore();
 }
 
 String generateTempId() {
@@ -55,8 +57,8 @@ Future<File> generateStatusFileName(String tag) async {
 
 String getWSLPath(String wslPath) {
   return wslPath
-      .replaceAllMapped(
-          RegExp(r'^([a-z]):', caseSensitive: false), (match) => '/mnt/$match')
+      .replaceAllMapped(RegExp(r'^([a-z]):', caseSensitive: false),
+          (match) => '/mnt/${match.group(1)}')
       .split("\\")
       .join("/")
       .toLowerCase();
@@ -107,6 +109,7 @@ Future<ServerInst> startServer(List<String> cmd, File statusFile) async {
   final proc = await Process.start(cmd[0], cmd.sublist(1));
 
   if (Platform.environment['EDGEDB_DEBUG_SERVER'] != null) {
+    print('starting server: ${cmd.join(' ')}');
     proc.stdout.listen((event) => stdout.add(event));
     proc.stderr.listen((event) => stderr.add(event));
   } else {
@@ -114,7 +117,12 @@ Future<ServerInst> startServer(List<String> cmd, File statusFile) async {
     proc.stderr.drain();
   }
 
-  final runtimeData = await getServerInfo(statusFile);
+  final runtimeData = await Future.any([
+    getServerInfo(statusFile),
+    proc.exitCode.then((code) {
+      throw Exception('server exited with code $code before status file ready');
+    })
+  ]);
 
   if (Platform.isWindows && runtimeData['tls_cert_file'] != null) {
     final tmpFile =
