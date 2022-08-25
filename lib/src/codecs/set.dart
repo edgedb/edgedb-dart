@@ -19,7 +19,6 @@
 import '../errors/errors.dart';
 import '../primitives/buffer.dart';
 import '../utils/indent.dart';
-import 'array.dart';
 import 'codecs.dart';
 
 class SetCodec<T> extends Codec {
@@ -105,7 +104,7 @@ class SetCodec<T> extends Codec {
     for (var i = 0; i < len; i++) {
       final elemLen = buf.readInt32();
       if (elemLen == -1) {
-        result.add(null!);
+        throw ProtocolError("unexpected NULL value in set");
       } else {
         final elemBuf = buf.slice(elemLen);
         result.add(subCodec.decode(elemBuf));

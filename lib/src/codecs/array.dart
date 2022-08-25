@@ -94,7 +94,7 @@ class ArrayCodec<T> extends Codec {
     for (var i = 0; i < len; i++) {
       final elemLen = buf.readInt32();
       if (elemLen == -1) {
-        result.add(null!);
+        throw ProtocolError("unexpected NULL value in array");
       } else {
         final elemBuf = buf.slice(elemLen);
         result.add(subCodec.decode(elemBuf));

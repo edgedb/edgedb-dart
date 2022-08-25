@@ -413,19 +413,139 @@ class ClientPool<Connection extends BaseProtocol> {
   }
 }
 
+/// Abstract class that defines the interface for the `execute()` and
+/// `query*()` methods.
+///
+/// Implemented by [Client] and [Transaction].
+///
+/// ## Parameters​
+/// If your query contains parameters (e.g. `$foo`), you can pass in values as
+/// the second argument to all the `execute()` and `query*()` methods.
+///
+/// Named parameters are expected to be passed as a `Map<String, dynamic>`, and
+/// positional parameters as a `List<dynamic>`.
+///
+/// ```dart
+/// // Named parameters
+/// await client.execute(r'''insert Movie {
+///   title := <str>$title
+/// }''', {'title': 'Iron Man'});
+///
+/// // Positional parameters
+/// await client.execute(r'''insert Movie {
+///   title := <str>$0
+/// }''', ['Iron Man']);
+/// ```
+///
+/// Remember that [parameters](https://www.edgedb.com/docs/edgeql/parameters#parameter-types-and-json)
+/// can only be scalars or arrays of scalars.
+///
+/// ## Scripts​
+/// All the `execute()` and the `query*()` methods support scripts (queries
+/// containing multiple statements). The statements are run in an implicit
+/// transaction (unless already in an explicit transaction), so the whole
+/// script remains atomic. For the `query*()` methods only the result of the
+/// final statement in the script will be returned.
+///
+/// ```dart
+/// final result = await client.query(r'''
+///   insert Movie {
+///     title := <str>$title
+///   };
+///   insert Person {
+///     name := <str>$name
+///   };
+/// ''', {
+///   'title': 'Thor: Ragnarok',
+///   'name': 'Anson Mount'
+/// });
+/// // [{id: "5dd2557b..."}]
+/// // Note: only the single item of the `insert Person ...`
+/// // statement is returned
+/// ```
+///
+/// For more fine grained control of atomic exectution of multiple statements,
+/// use the [Client.transaction()] API.
+///
+/// ## Type Conversion
+/// EdgeDB types are decoded into Dart types (or the other way for query
+/// parameters) as follows:
+///
+/// | EdgeDB type                                 | Dart type                     |
+/// |---------------------------------------------|-------------------------------|
+/// | Sets                                        | [List<dynamic>]               |
+/// | Arrays                                      | [List<dynamic>]               |
+/// | Objects                                     | [Map<String, dynamic>]        |
+/// | Tuples (`tuple<x, y, ...>`)                 | [List<dynamic>]               |
+/// | Named tuples (`tuple<foo: x, bar: y, ...>`) | [Map<String, dynamic>]        |
+/// | Ranges                                      | _(unsupported)_               |
+/// | Enums                                       | [String]                      |
+/// | `str`                                       | [String]                      |
+/// | `bool`                                      | [bool]                        |
+/// | `int16`/`int32`/`int64`                     | [int]                         |
+/// | `float32`/`float64`                         | [double]                      |
+/// | `json`                                      | as decoded by [json.decode()] |
+/// | `uuid`                                      | [String]                      |
+/// | `bigint`                                    | [BigInt]                      |
+/// | `decimal`                                   | _(unsupported)_               |
+/// | `bytes`                                     | [Uint8List]                   |
+/// | `datetime`                                  | [DateTime]                    |
+/// | `duration`                                  | [Duration]                    |
+/// | `cal::local_datetime`                       | _(unsupported)_               |
+/// | `cal::local_date`                           | _(unsupported)_               |
+/// | `cal::local_time`                           | _(unsupported)_               |
+/// | `cal::relative_duration`                    | _(unsupported)_               |
+/// | `cal::date_duration`                        | _(unsupported)_               |
+/// | `cfg::memory`                               | [ConfigMemory]                |
+///
 abstract class Executor {
+  /// Executes a query, returning no result.
+  ///
+  /// For details on [args] see [Executor] docs.
   Future<void> execute(String query, [dynamic args]);
 
+  /// Executes a query, returning a `List` of results.
+  ///
+  /// For details on result types and [args] see [Executor] docs.
   Future<List<dynamic>> query(String query, [dynamic args]);
 
+  /// Executes a query, returning the result as a JSON encoded `String`.
+  ///
+  /// For details on [args] see [Executor] docs.
   Future<String> queryJSON(String query, [dynamic args]);
 
+  /// Executes a query, returning a single (possibly `null`) result.
+  ///
+  /// The query must return no more than one element. If the query returns
+  /// more than one element, a [ResultCardinalityMismatchError] error is thrown.
+  ///
+  /// For details on result types and [args] see [Executor] docs.
   Future<dynamic> querySingle(String query, [dynamic args]);
 
+  /// Executes a query, returning the result as a JSON encoded `String`.
+  ///
+  /// The query must return no more than one element. If the query returns
+  /// more than one element, a [ResultCardinalityMismatchError] error is thrown.
+  ///
+  /// For details on [args] see [Executor] docs.
   Future<String> querySingleJSON(String query, [dynamic args]);
 
+  /// Executes a query, returning a single (non-`null`) result.
+  ///
+  /// The query must return exactly one element. If the query returns more
+  /// than one element, a [ResultCardinalityMismatchError] error is thrown.
+  /// If the query returns an empty set, a [NoDataError] error is thrown.
+  ///
+  /// For details on result types and [args] see [Executor] docs.
   Future<dynamic> queryRequiredSingle(String query, [dynamic args]);
 
+  /// Executes a query, returning the result as a JSON encoded `String`.
+  ///
+  /// The query must return exactly one element. If the query returns more
+  /// than one element, a [ResultCardinalityMismatchError] error is thrown.
+  /// If the query returns an empty set, a [NoDataError] error is thrown.
+  ///
+  /// For details on [args] see [Executor] docs.
   Future<String> queryRequiredSingleJSON(String query, [dynamic args]);
 
   Future<dynamic> _executeWithCodec<T>(String methodName, Codec outCodec,
@@ -440,10 +560,25 @@ Future<dynamic> executeWithCodec<T>(
     Cardinality resultCard,
     String query,
     dynamic args) {
-  return executor._executeWithCodec(
+  return executor._executeWithCodec<T>(
       methodName, outCodec, inCodec, resultCard, query, args);
 }
 
+/// Represents a pool of connections to the database, provides methods to run
+/// queries and manages the context in which queries are run (ie. setting
+/// globals, modifying session config, etc.)
+///
+/// The [Client] class cannot be instantiated directly, and is instead created
+/// by the [createClient()] function. Since creating a client is relatively
+/// expensive, it is recommended to create a single [Client] instance that you
+/// can then import and use across your app.
+///
+/// The `with*()` methods return a new [Client] instance derived from this
+/// instance. The derived instances all share the pool of connections managed
+/// by the root [Client] instance (ie. the instance created by [createClient()]),
+/// so calling the [ensureConnected()], [close()] or [terminate()] methods on
+/// any of these instances will affect them all.
+///
 class Client implements Executor {
   final ClientPool _pool;
   final Options _options;
@@ -462,37 +597,138 @@ class Client implements Executor {
     return Client._create(_pool, _options.withSession(session));
   }
 
+  /// Returns a new [Client] instance with the specified module aliases
+  ///
+  /// The [aliases] parameter is merged with any existing module aliases
+  /// defined on the current client instance.
+  ///
+  /// If the alias `name` is `'module'` this is equivalent to using the
+  /// `set module` command, otherwise it is equivalent to the `set alias`
+  /// command.
+  ///
+  /// Example:
+  /// ```dart
+  /// final user = await client.withModuleAliases({
+  ///   'module': 'sys'
+  /// }).querySingle('''
+  ///   select get_version_as_str()
+  /// ''');
+  /// // "2.0"
+  /// ```
+  ///
   Client withModuleAliases(Map<String, String> aliases) {
     return Client._create(_pool,
         _options.withSession(_options.session.withModuleAliases(aliases)));
   }
 
+  /// Returns a new [Client] instance with the specified client session
+  /// configuration.
+  ///
+  /// The [config] parameter is merged with any existing
+  /// session config defined on the current client instance.
+  ///
+  /// Equivalent to using the `configure session` command. For available
+  /// configuration parameters refer to the
+  /// [Config documentation](https://www.edgedb.com/docs/stdlib/cfg#client-connections).
+  ///
   Client withConfig(Map<String, Object> config) {
     return Client._create(
         _pool, _options.withSession(_options.session.withConfig(config)));
   }
 
+  /// Returns a new [Client] instance with the specified global values.
+  ///
+  /// The [globals] parameter is merged with any existing globals defined
+  /// on the current client instance.
+  ///
+  /// Equivalent to using the `set global` command.
+  ///
+  /// Example:
+  /// ```dart
+  /// final user = await client.withGlobals({
+  ///   'userId': '...'
+  /// }).querySingle('''
+  ///   select User {name} filter .id = global userId
+  /// ''');
+  /// ```
+  ///
   Client withGlobals(Map<String, dynamic> globals) {
     return Client._create(
         _pool, _options.withSession(_options.session.withGlobals(globals)));
   }
 
+  /// If the client does not yet have any open connections in its pool,
+  /// attempts to open a connection, else returns immediately.
+  ///
+  /// Since the client lazily creates new connections as needed (up to the
+  /// configured `concurrency` limit), the first connection attempt will
+  /// usually only happen when the first query is run on a client.
+  /// The [ensureConnected()] method allows you to explicitly check that the
+  /// client can connect to the database without running a query
+  /// (can be useful to catch any errors resulting from connection
+  /// mis-configuration).
   Future<void> ensureConnected() {
     return _pool.ensureConnected();
   }
 
+  /// Whether [close()] (or [terminate()]) has been called on the client.
+  /// If [isClosed] is `true`, subsequent calls to query methods will fail.
   bool get isClosed {
     return _pool.isClosed;
   }
 
+  /// Close the client's open connections gracefully.
+  ///
+  /// Returns a `Future` that completes when all connections in the client's
+  /// pool have finished any currently running query. Any pending queries
+  /// awaiting a free connection from the pool, and have not started executing
+  /// yet, will return an error.
+  ///
+  /// A warning is produced if the pool takes more than 60 seconds to close.
   Future<void> close() {
     return _pool.close();
   }
 
+  /// Immediately closes all connections in the client's pool, without waiting
+  /// for any running queries to finish.
   void terminate() {
     _pool.terminate();
   }
 
+  /// Execute a retryable transaction.
+  ///
+  /// Use this method to atomically execute multiple queries, where you also
+  /// need to run some logic client side. If you only need to run multiple
+  /// queries atomically, instead consider just using the `execute()`/
+  /// `query*()` methods - they all support queries containing multiple
+  /// statements.
+  ///
+  /// The [transaction()] method expects an [action] function returning a
+  /// `Future`, and will automatically handle starting the transaction before
+  /// the [action] function is run, and commiting / rolling back the transaction
+  /// when the `Future` completes / throws an error.
+  ///
+  /// The [action] function is passed a [Transaction] object, which implements
+  /// the same `execute()`/`query*()` methods as on [Client], and should be
+  /// used instead of the [Client] methods. The notable difference of these
+  /// methods on [Transaction] as compared to the [Client] query methods, is
+  /// that they do not attempt to retry on errors. Instead the entire [action]
+  /// function is re-executed if a retryable error (such as a transient
+  /// network error or transaction serialization error) is thrown inside it.
+  /// Non-retryable errors will cause the transaction to be automatically
+  /// rolled back, and the error re-thrown by [transaction()].
+  ///
+  /// A key implication of the whole [action] function being re-executed on
+  /// transaction retries, is that non-querying code will also be re-executed,
+  /// so the [action] should should not have side effects. It is also
+  /// recommended that the [action] does not have long running code, as
+  /// holding a transaction open is expensive on the server, and will negatively
+  /// impact performance.
+  ///
+  /// The number of times [transaction()] will attempt to execute the
+  /// transaction, and the backoff timeout between retries can be configured
+  /// with [withRetryOptions()].
+  ///
   Future<T> transaction<T>(Future<T> Function(Transaction) action) async {
     final holder = await _pool.acquireHolder(_options);
     try {
@@ -590,6 +826,29 @@ class Client implements Executor {
   }
 }
 
+/// Creates a new [Client] instance with the provided connection options.
+///
+/// Usually it's recommended to not pass any connection options here, and
+/// instead let the client resolve the connection options from the edgedb
+/// project or environment variables. See the
+/// [Client Library Connection](https://www.edgedb.com/docs/reference/connection)
+/// documentation for details on connection options and how they are
+/// resolved.
+///
+/// The [config] parameter allows you to pass in a [ConnectConfig] object, which
+/// is just a wrapper object containing connection options to make them easier
+/// to manage in your application. If a connection option exists both in the
+/// [config] object and is passed as a parameter, the value passed as a
+/// parameter will override the value in the [config] object.
+///
+/// Alongside the connection options, there are the following parameters:
+/// - [concurrency]: Specifies the maximum number of connections the [Client]
+///                  will create in it's connection pool. If not specified the
+///                  concurrency will be controlled by the server. This is
+///                  recommended as it allows the server to better manage the
+///                  number of client connections based on it's own available
+///                  resources.
+///
 Client createClient(
     {String? dsn,
     String? instanceName,

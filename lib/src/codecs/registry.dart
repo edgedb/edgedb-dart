@@ -4,15 +4,9 @@ import '../errors/errors.dart';
 import '../primitives/buffer.dart';
 import '../primitives/lru.dart';
 import '../primitives/types.dart';
-import 'array.dart';
 import 'codecs.dart';
 import 'consts.dart';
-import 'enum.dart';
-import 'namedtuple.dart';
-import 'object.dart';
-import 'set.dart';
 import 'sparse_object.dart';
-import 'tuple.dart';
 
 const codecsCacheSize = 1000;
 const codecsBuildCacheSize = 200;

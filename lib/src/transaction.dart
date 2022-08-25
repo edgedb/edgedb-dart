@@ -20,9 +20,9 @@ part of 'client.dart';
 
 enum TransactionState { active, committed, rolledback, failed }
 
-class Transaction<Connection extends BaseProtocol> implements Executor {
+class Transaction implements Executor {
   final ClientConnectionHolder _holder;
-  final Connection _conn;
+  final BaseProtocol _conn;
 
   TransactionState _state = TransactionState.active;
   bool _opInProgress = false;

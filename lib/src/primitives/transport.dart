@@ -115,7 +115,6 @@ TransportCreator transportCreator(Stream<Uint8List> stream, IOSink sink) {
 }
 
 class MessageTransport {
-  late StreamSubscription<ReadMessageBuffer> _sub;
   late IOSink _sink;
   Completer<ReadMessageBuffer>? _messageAwaiter;
   bool _closed = false;
@@ -126,7 +125,7 @@ class MessageTransport {
       required Map<MessageType, void Function(ReadMessageBuffer)>
           asyncMessageHandlers}) {
     _sink = sink;
-    _sub = createMessageStream(stream).listen((message) {
+    createMessageStream(stream).listen((message) {
       // print('got message: ${message.messageType.name}');
       if (asyncMessageHandlers.containsKey(message.messageType)) {
         return asyncMessageHandlers[message.messageType]!(message);
