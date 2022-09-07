@@ -24,10 +24,45 @@ const GiB = 1024 * MiB;
 const TiB = 1024 * GiB;
 const PiB = 1024 * TiB;
 
+final _memoryRegex = RegExp(r'^(?<bytes>-?\d+)(?<prefix>Ki|Mi|Gi|Ti|Pi)?B$');
+
+/// Represents an amount of memory in bytes.
+///
+/// Uses the base-2 `KiB` notation (1024 bytes), instead of the more
+/// ambiguous 'kB', which can mean 1000 or 1024 bytes.
+///
 class ConfigMemory {
   final int _bytes;
 
   ConfigMemory(this._bytes);
+
+  factory ConfigMemory.parse(String mem) {
+    final match = _memoryRegex.firstMatch(mem);
+    if (match == null) {
+      throw FormatException(
+          'invalid memory string, expected integer value with '
+          'B/KiB/MiB/GiB/TiB/PiB units');
+    }
+    int bytes = int.parse(match.namedGroup('bytes')!, radix: 10);
+    switch (match.namedGroup('prefix')) {
+      case 'Ki':
+        bytes *= KiB;
+        break;
+      case 'Mi':
+        bytes *= MiB;
+        break;
+      case 'Gi':
+        bytes *= GiB;
+        break;
+      case 'Ti':
+        bytes *= TiB;
+        break;
+      case 'Pi':
+        bytes *= PiB;
+        break;
+    }
+    return ConfigMemory(bytes);
+  }
 
   int get bytes {
     return _bytes;

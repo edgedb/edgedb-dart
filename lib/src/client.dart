@@ -129,7 +129,7 @@ class ClientConnectionHolder<Connection extends BaseProtocol> {
         if (err is EdgeDBError &&
             err.hasTag(EdgeDBErrorTag.shouldRetry) &&
             !(commitFailed && err is ClientConnectionError)) {
-          final rule = options.retryOptions.getRuleForException(err);
+          final rule = getRuleForException(options.retryOptions, err);
           if (iteration + 1 >= rule.attempts) {
             rethrow;
           }
@@ -170,7 +170,7 @@ class ClientConnectionHolder<Connection extends BaseProtocol> {
                     conn.getQueryCapabilities(
                             query, outputFormat, expectedCardinality) ==
                         0)) {
-          final rule = options.retryOptions.getRuleForException(err);
+          final rule = getRuleForException(options.retryOptions, err);
           if (iteration + 1 >= rule.attempts) {
             rethrow;
           }
@@ -358,7 +358,7 @@ class ClientPool<Connection extends BaseProtocol> {
   ///
   /// Waits until all client pool connections are released, closes them and
   /// shuts down the client. If any error occurs
-  /// in ``close()``, the client will terminate by calling ``terminate()``.
+  /// in `close()`, the client will terminate by calling `terminate()`.
   Future<void> close() async {
     if (_closing != null) {
       return _closing!.future;
@@ -418,100 +418,23 @@ class ClientPool<Connection extends BaseProtocol> {
 ///
 /// Implemented by [Client] and [Transaction].
 ///
-/// ## Parameters​
-/// If your query contains parameters (e.g. `$foo`), you can pass in values as
-/// the second argument to all the `execute()` and `query*()` methods.
-///
-/// Named parameters are expected to be passed as a `Map<String, dynamic>`, and
-/// positional parameters as a `List<dynamic>`.
-///
-/// ```dart
-/// // Named parameters
-/// await client.execute(r'''insert Movie {
-///   title := <str>$title
-/// }''', {'title': 'Iron Man'});
-///
-/// // Positional parameters
-/// await client.execute(r'''insert Movie {
-///   title := <str>$0
-/// }''', ['Iron Man']);
-/// ```
-///
-/// Remember that [parameters](https://www.edgedb.com/docs/edgeql/parameters#parameter-types-and-json)
-/// can only be scalars or arrays of scalars.
-///
-/// ## Scripts​
-/// All the `execute()` and the `query*()` methods support scripts (queries
-/// containing multiple statements). The statements are run in an implicit
-/// transaction (unless already in an explicit transaction), so the whole
-/// script remains atomic. For the `query*()` methods only the result of the
-/// final statement in the script will be returned.
-///
-/// ```dart
-/// final result = await client.query(r'''
-///   insert Movie {
-///     title := <str>$title
-///   };
-///   insert Person {
-///     name := <str>$name
-///   };
-/// ''', {
-///   'title': 'Thor: Ragnarok',
-///   'name': 'Anson Mount'
-/// });
-/// // [{id: "5dd2557b..."}]
-/// // Note: only the single item of the `insert Person ...`
-/// // statement is returned
-/// ```
-///
-/// For more fine grained control of atomic exectution of multiple statements,
-/// use the [Client.transaction()] API.
-///
-/// ## Type Conversion
-/// EdgeDB types are decoded into Dart types (or the other way for query
-/// parameters) as follows:
-///
-/// | EdgeDB type                                 | Dart type                     |
-/// |---------------------------------------------|-------------------------------|
-/// | Sets                                        | [List<dynamic>]               |
-/// | Arrays                                      | [List<dynamic>]               |
-/// | Objects                                     | [Map<String, dynamic>]        |
-/// | Tuples (`tuple<x, y, ...>`)                 | [List<dynamic>]               |
-/// | Named tuples (`tuple<foo: x, bar: y, ...>`) | [Map<String, dynamic>]        |
-/// | Ranges                                      | _(unsupported)_               |
-/// | Enums                                       | [String]                      |
-/// | `str`                                       | [String]                      |
-/// | `bool`                                      | [bool]                        |
-/// | `int16`/`int32`/`int64`                     | [int]                         |
-/// | `float32`/`float64`                         | [double]                      |
-/// | `json`                                      | as decoded by [json.decode()] |
-/// | `uuid`                                      | [String]                      |
-/// | `bigint`                                    | [BigInt]                      |
-/// | `decimal`                                   | _(unsupported)_               |
-/// | `bytes`                                     | [Uint8List]                   |
-/// | `datetime`                                  | [DateTime]                    |
-/// | `duration`                                  | [Duration]                    |
-/// | `cal::local_datetime`                       | _(unsupported)_               |
-/// | `cal::local_date`                           | _(unsupported)_               |
-/// | `cal::local_time`                           | _(unsupported)_               |
-/// | `cal::relative_duration`                    | _(unsupported)_               |
-/// | `cal::date_duration`                        | _(unsupported)_               |
-/// | `cfg::memory`                               | [ConfigMemory]                |
-///
 abstract class Executor {
   /// Executes a query, returning no result.
   ///
-  /// For details on [args] see [Executor] docs.
+  /// For details on [args] see the `edgedb` library
+  /// [docs page](../edgedb-library.html).
   Future<void> execute(String query, [dynamic args]);
 
   /// Executes a query, returning a `List` of results.
   ///
-  /// For details on result types and [args] see [Executor] docs.
+  /// For details on result types and [args] see the `edgedb` library
+  /// [docs page](../edgedb-library.html).
   Future<List<dynamic>> query(String query, [dynamic args]);
 
   /// Executes a query, returning the result as a JSON encoded `String`.
   ///
-  /// For details on [args] see [Executor] docs.
+  /// For details on [args] see the `edgedb` library
+  /// [docs page](../edgedb-library.html).
   Future<String> queryJSON(String query, [dynamic args]);
 
   /// Executes a query, returning a single (possibly `null`) result.
@@ -519,7 +442,8 @@ abstract class Executor {
   /// The query must return no more than one element. If the query returns
   /// more than one element, a [ResultCardinalityMismatchError] error is thrown.
   ///
-  /// For details on result types and [args] see [Executor] docs.
+  /// For details on result types and [args] see the `edgedb` library
+  /// [docs page](../edgedb-library.html).
   Future<dynamic> querySingle(String query, [dynamic args]);
 
   /// Executes a query, returning the result as a JSON encoded `String`.
@@ -527,7 +451,8 @@ abstract class Executor {
   /// The query must return no more than one element. If the query returns
   /// more than one element, a [ResultCardinalityMismatchError] error is thrown.
   ///
-  /// For details on [args] see [Executor] docs.
+  /// For details on [args] see the `edgedb` library
+  /// [docs page](../edgedb-library.html).
   Future<String> querySingleJSON(String query, [dynamic args]);
 
   /// Executes a query, returning a single (non-`null`) result.
@@ -536,7 +461,8 @@ abstract class Executor {
   /// than one element, a [ResultCardinalityMismatchError] error is thrown.
   /// If the query returns an empty set, a [NoDataError] error is thrown.
   ///
-  /// For details on result types and [args] see [Executor] docs.
+  /// For details on result types and [args] see the `edgedb` library
+  /// [docs page](../edgedb-library.html).
   Future<dynamic> queryRequiredSingle(String query, [dynamic args]);
 
   /// Executes a query, returning the result as a JSON encoded `String`.
@@ -545,7 +471,8 @@ abstract class Executor {
   /// than one element, a [ResultCardinalityMismatchError] error is thrown.
   /// If the query returns an empty set, a [NoDataError] error is thrown.
   ///
-  /// For details on [args] see [Executor] docs.
+  /// For details on [args] see the `edgedb` library
+  /// [docs page](../edgedb-library.html).
   Future<String> queryRequiredSingleJSON(String query, [dynamic args]);
 
   Future<dynamic> _executeWithCodec<T>(String methodName, Codec outCodec,
@@ -585,19 +512,28 @@ class Client implements Executor {
 
   Client._create(this._pool, this._options);
 
+  /// Returns a new [Client] instance with the specified [TransactionOptions].
   Client withTransactionOptions(TransactionOptions options) {
     return Client._create(_pool, _options.withTransactionOptions(options));
   }
 
+  /// Returns a new [Client] instance with the specified [RetryOptions].
+  ///
   Client withRetryOptions(RetryOptions options) {
     return Client._create(_pool, _options.withRetryOptions(options));
   }
 
+  /// Returns a new [Client] instance with the specified [Session] options.
+  ///
+  /// Instead of specifying an entirely new [Session] options object, [Client]
+  /// also implements the [withModuleAliases], [withConfig] and [withGlobals]
+  /// methods for convenience.
+  ///
   Client withSession(Session session) {
     return Client._create(_pool, _options.withSession(session));
   }
 
-  /// Returns a new [Client] instance with the specified module aliases
+  /// Returns a new [Client] instance with the specified module aliases.
   ///
   /// The [aliases] parameter is merged with any existing module aliases
   /// defined on the current client instance.
