@@ -357,7 +357,7 @@ class CodecsRegistry {
             throw ProtocolError(
                 'could not build range codec: missing subcodec');
           }
-          // res = RangeCodec(tid, subCodec);
+          res = RangeCodec(tid, subCodec);
         }
     }
 

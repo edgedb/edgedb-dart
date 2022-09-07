@@ -19,6 +19,7 @@ export 'namedtuple.dart';
 export 'object.dart';
 export 'set.dart';
 export 'tuple.dart';
+export 'range.dart';
 
 abstract class Codec {
   final String tid;

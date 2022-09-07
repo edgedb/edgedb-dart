@@ -31,7 +31,9 @@ class ArrayCodec<T> extends Codec {
 
   @override
   void encode(WriteBuffer buf, dynamic object) {
-    if (!(subCodec is ScalarCodec || subCodec is TupleCodec)) {
+    if (!(subCodec is ScalarCodec ||
+        subCodec is TupleCodec ||
+        subCodec is RangeCodec)) {
       throw InvalidArgumentError("only arrays of scalars are supported");
     }
 

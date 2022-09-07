@@ -221,7 +221,7 @@ void main() {
       final bytes = (ByteData(4)..setInt32(0, -12312)).buffer.asUint8List();
       expect(await client.querySingle(r'select <bytes>$0', [bytes]), bytes);
 
-      final dt = DateTime.now();
+      final dt = DateTime.now().toUtc();
       expect(await client.querySingle(r'select <datetime>$0', [dt]), dt);
       expect(
           await client
@@ -366,7 +366,82 @@ void main() {
     }
   });
 
-  test(skip: 'range type unimplemented', "fetch: ranges", () async {});
+  test("fetch: ranges", () async {
+    expandRangeEQL(String lower, String upper) {
+      return [
+        [false, false],
+        [true, false],
+        [false, true],
+        [true, true],
+      ]
+          .map((inc) =>
+              'range($lower, $upper, inc_lower := ${inc[0]}, inc_upper := ${inc[1]})')
+          .join(",\n");
+    }
+
+    expandRange(dynamic lower, dynamic upper) {
+      return [
+        Range<dynamic>(lower, upper, incLower: false, incUpper: false),
+        Range<dynamic>(lower, upper, incLower: true, incUpper: false),
+        Range<dynamic>(lower, upper, incLower: false, incUpper: true),
+        Range<dynamic>(lower, upper, incLower: true, incUpper: true),
+      ];
+    }
+
+    final client = getClient();
+
+    try {
+      final res = await client.querySingle('''
+        select {
+          ints := (${expandRangeEQL("123", "456")}),
+          floats := (${expandRangeEQL("123.456", "456.789")}),
+          datetimes := (${expandRangeEQL("<datetime>'2022-07-01T16:00:00+00'", "<datetime>'2022-07-01T16:30:00+00'")}),
+        }
+      ''');
+      // local_dates := (${expandRangeEQL("<cal::local_date>'2022-07-01'", "<cal::local_date>'2022-07-14'")}),
+      // local_datetimes := (${expandRangeEQL("<cal::local_datetime>'2022-07-01T12:00:00'", "<cal::local_datetime>'2022-07-14T12:00:00'")}),
+
+      expect(res, {
+        'ints': [
+          Range<dynamic>(124, 456),
+          Range<dynamic>(123, 456),
+          Range<dynamic>(124, 457),
+          Range<dynamic>(123, 457),
+        ],
+        'floats': expandRange(123.456, 456.789),
+        'datetimes': expandRange(DateTime.parse("2022-07-01T16:00:00Z"),
+            DateTime.parse("2022-07-01T16:30:00Z")),
+        // local_dates: [
+        //   new Range(new LocalDate(2022, 7, 2), new LocalDate(2022, 7, 14)),
+        //   new Range(new LocalDate(2022, 7, 1), new LocalDate(2022, 7, 14)),
+        //   new Range(new LocalDate(2022, 7, 2), new LocalDate(2022, 7, 15)),
+        //   new Range(new LocalDate(2022, 7, 1), new LocalDate(2022, 7, 15)),
+        // ],
+        // local_datetimes: expandRangeJS(
+        //   new LocalDateTime(2022, 7, 1, 12),
+        //   new LocalDateTime(2022, 7, 14, 12)
+        // ),
+      });
+
+      expect(await client.querySingle('''
+          select all({
+            [${expandRangeEQL("123", "456")}] = <array<range<int64>>>\$ints,
+            [${expandRangeEQL("123.456", "456.789")}] = <array<range<float64>>>\$floats,
+            [${expandRangeEQL("<datetime>'2022-07-01T16:00:00+00'", "<datetime>'2022-07-01T16:30:00+00'")}] = <array<range<datetime>>>\$datetimes,
+          })''', res), true);
+
+      // [${expandRangeEQL(
+      //   "<cal::local_date>'2022-07-01'",
+      //   "<cal::local_date>'2022-07-14'"
+      // )}] = <array<range<cal::local_date>>>$local_dates,
+      // [${expandRangeEQL(
+      //   "<cal::local_datetime>'2022-07-01T12:00:00'",
+      //   "<cal::local_datetime>'2022-07-14T12:00:00'"
+      // )}] = <array<range<cal::local_datetime>>>$local_datetimes,
+    } finally {
+      await client.close();
+    }
+  });
 
   test(
       skip: 'DateDuration type unimplemented',

@@ -236,17 +236,28 @@ _WalkCodecReturn _walkCodec(Codec codec, Cardinality card,
             'returnType': Reference(typeName).property('_fromMap')
         }));
   }
-  if (codec is SetCodec || codec is ArrayCodec) {
+  if (codec is SetCodec || codec is ArrayCodec || codec is RangeCodec) {
     final child = _walkCodec(
-        (codec is SetCodec) ? codec.subCodec : (codec as ArrayCodec).subCodec,
+        (codec is SetCodec)
+            ? codec.subCodec
+            : (codec is ArrayCodec)
+                ? codec.subCodec
+                : (codec as RangeCodec).subCodec,
         Cardinality.one,
         typeName,
         file);
     return _WalkCodecReturn(
         TypeReference((builder) => builder
-          ..symbol = 'List'
+          ..symbol = (codec is RangeCodec)
+              ? Reference('Range', 'package:edgedb/edgedb.dart').symbol
+              : 'List'
           ..types.add(child.typeRef)),
-        Reference(codec is SetCodec ? 'SetCodec' : 'ArrayCodec',
+        Reference(
+                codec is SetCodec
+                    ? 'SetCodec'
+                    : codec is ArrayCodec
+                        ? 'ArrayCodec'
+                        : 'RangeCodec',
                 'package:edgedb/src/codecs/codecs.dart')
             .newInstance([
           literalString(codec.tid),
