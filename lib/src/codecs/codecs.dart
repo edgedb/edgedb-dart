@@ -85,11 +85,11 @@ final _scalarCodecConstructors = {
   'std::uuid': UUIDCodec.new,
   'std::datetime': DateTimeCodec.new,
   'std::duration': DurationCodec.new,
-  // 'cal::local_date': LocalDateCodec.new,
-  // 'cal::local_time': LocalTimeCodec.new,
-  // 'cal::local_datetime': LocalDateTimeCodec.new,
-  // 'cal::relative_duration': RelativeDurationCodec.new,
-  // 'cal::date_duration': DateDurationCodec.new,
+  'cal::local_date': LocalDateCodec.new,
+  'cal::local_time': LocalTimeCodec.new,
+  'cal::local_datetime': LocalDateTimeCodec.new,
+  'cal::relative_duration': RelativeDurationCodec.new,
+  'cal::date_duration': DateDurationCodec.new,
   'cfg::memory': ConfigMemoryCodec.new,
 }.map<String, ScalarCodec Function(String)>((typename, type) {
   final id = knownTypeNames[typename];
