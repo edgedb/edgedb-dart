@@ -228,13 +228,12 @@ void main() {
               .querySingle(r'select [<datetime>$0, <datetime>$0]', [dt]),
           [dt, dt]);
 
-      // final ldt = LocalDateTime(2012, 6, 30, 14, 11, 33, 123, 456);
-      // final res = await client.querySingle(r'select <cal::local_datetime>$0', [ldt]);
-      // expect(res, isA<LocalDateTime>());
-      // expect((res as LocalDateTime).hour).toBe(14);
-      // expect((res as LocalDateTime).toString()).toBe(
-      //   "2012-06-30T14:11:33.123456"
-      // );
+      final ldt = LocalDateTime(2012, 6, 30, 14, 11, 33, 123, 456);
+      final res =
+          await client.querySingle(r'select <cal::local_datetime>$0', [ldt]);
+      expect(res, isA<LocalDateTime>());
+      expect((res as LocalDateTime).hour, 14);
+      expect(res.toString(), '2012-06-30T14:11:33.123456');
 
       expect(
           await client.querySingle(r'select len(<array<int64>>$0)', [
@@ -297,12 +296,44 @@ void main() {
     }
   });
 
-  test(
-      skip: 'LocalDate type unimplemented',
-      "fetch: cal::local_date",
-      () async {});
+  test("fetch: cal::local_date", () async {
+    final con = getClient();
 
-  test(skip: 'LocalTime type unimplemented', "fetch: local_time", () async {});
+    try {
+      var res = await con.querySingle("select <cal::local_date>'2016-01-10'");
+      expect(res, isA<LocalDate>());
+      expect(res.toString(), '2016-01-10');
+
+      res = await con.querySingle(r'select <cal::local_date>$0;', [res]);
+      expect(res, isA<LocalDate>());
+      expect(res.toString(), '2016-01-10');
+    } finally {
+      await con.close();
+    }
+  });
+
+  test("fetch: local_time", () async {
+    final con = getClient();
+    try {
+      for (var time in [
+        "11:12:13",
+        "00:01:11.34",
+        "00:00:00",
+        "23:59:59.999",
+      ]) {
+        var res = await con.querySingle(
+            r'select (<cal::local_time><str>$time, <str><cal::local_time><str>$time);',
+            {time});
+        expect(res[0].toString(), res[1]);
+
+        var res2 = await con
+            .querySingle(r'select <cal::local_time>$time;', {time: res[0]});
+        expect(res2.toString(), res[0].toString());
+      }
+    } finally {
+      await con.close();
+    }
+  });
 
   test("fetch: duration", () async {
     final client = getClient();
@@ -330,10 +361,32 @@ void main() {
     }
   });
 
-  test(
-      skip: 'RelativeDurationCodec unimplemented',
-      "fetch: relative_duration",
-      () async {});
+  test("fetch: relative_duration", () async {
+    final con = getClient();
+    try {
+      for (var time in [
+        "24 hours",
+        "68464977 seconds 74 milliseconds 11 microseconds",
+        "-752043.296 milliseconds",
+        "20 years 5 days 10 seconds",
+        "3 months",
+        "7 weeks 9 microseconds",
+      ]) {
+        var res = await con.querySingle(r'''
+        select (
+          <cal::relative_duration><str>$time,
+          <str><cal::relative_duration><str>$time,
+        );''', {time});
+        expect(res[0].toString(), res[1]);
+
+        var res2 = await con.querySingle(
+            r'select <cal::relative_duration>$time;', {time: res[0]});
+        expect(res2, res[0]);
+      }
+    } finally {
+      await con.close();
+    }
+  });
 
   test("fetch: ConfigMemory", () async {
     final client = getClient();

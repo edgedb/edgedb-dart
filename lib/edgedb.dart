@@ -76,16 +76,21 @@
 /// | `bytes`                                     | [Uint8List]                   |
 /// | `datetime`                                  | [DateTime]                    |
 /// | `duration`                                  | [Duration]                    |
-/// | `cal::local_datetime`                       | _(unsupported)_               |
-/// | `cal::local_date`                           | _(unsupported)_               |
-/// | `cal::local_time`                           | _(unsupported)_               |
-/// | `cal::relative_duration`                    | _(unsupported)_               |
-/// | `cal::date_duration`                        | _(unsupported)_               |
+/// | `cal::local_datetime`                       | [LocalDateTime]               |
+/// | `cal::local_date`                           | [LocalDate]                   |
+/// | `cal::local_time`                           | [LocalTime]                   |
+/// | `cal::relative_duration`                    | [RelativeDuration]            |
+/// | `cal::date_duration`                        | [DateDuration]                |
 /// | `cfg::memory`                               | [ConfigMemory]                |
 ///
 /// ## Custom types
 /// For EdgeDB types that don't have a built-in Dart type, we provide some
 /// custom types:
+/// - [LocalDateTime]
+/// - [LocalDate]
+/// - [LocalTime]
+/// - [RelativeDuration]
+/// - [DateDuration]
 /// - [Range]
 /// - [ConfigMemory]
 ///
@@ -112,5 +117,7 @@ export 'src/client.dart' show createClient, Client, Executor, Transaction;
 export 'src/options.dart' hide serialiseState, getRuleForException;
 export 'src/connect_config.dart' show ConnectConfig, TLSSecurity;
 export 'src/errors/errors.dart';
+export 'src/datatypes/datetime.dart'
+    show LocalDateTime, LocalDate, LocalTime, RelativeDuration, DateDuration;
 export 'src/datatypes/range.dart' show Range;
 export 'src/datatypes/memory.dart' show ConfigMemory;
