@@ -312,7 +312,7 @@ void main() {
     }
   });
 
-  test("fetch: local_time", () async {
+  test("fetch: cal::local_time", () async {
     final con = getClient();
     try {
       for (var time in [
@@ -323,12 +323,12 @@ void main() {
       ]) {
         var res = await con.querySingle(
             r'select (<cal::local_time><str>$time, <str><cal::local_time><str>$time);',
-            {time});
+            {'time': time});
         expect(res[0].toString(), res[1]);
 
         var res2 = await con
-            .querySingle(r'select <cal::local_time>$time;', {time: res[0]});
-        expect(res2.toString(), res[0].toString());
+            .querySingle(r'select <cal::local_time>$time;', {'time': res[0]});
+        expect(res2, res[0]);
       }
     } finally {
       await con.close();
@@ -361,7 +361,7 @@ void main() {
     }
   });
 
-  test("fetch: relative_duration", () async {
+  test("fetch: cal::relative_duration", () async {
     final con = getClient();
     try {
       for (var time in [
@@ -376,11 +376,11 @@ void main() {
         select (
           <cal::relative_duration><str>$time,
           <str><cal::relative_duration><str>$time,
-        );''', {time});
+        );''', {'time': time});
         expect(res[0].toString(), res[1]);
 
         var res2 = await con.querySingle(
-            r'select <cal::relative_duration>$time;', {time: res[0]});
+            r'select <cal::relative_duration>$time;', {'time': res[0]});
         expect(res2, res[0]);
       }
     } finally {
@@ -496,7 +496,7 @@ void main() {
     }
   });
 
-  test("fetch: date_duration", () async {
+  test("fetch: cal::date_duration", () async {
     final con = getClient();
 
     try {
@@ -511,11 +511,11 @@ void main() {
           select (
             <cal::date_duration><str>$time,
             <str><cal::date_duration><str>$time,
-          );''', {time});
+          );''', {'time': time});
         expect(res[0].toString(), res[1]);
 
-        var res2 = await con
-            .querySingle(r'select <cal::date_duration>$time;', {time: res[0]});
+        var res2 = await con.querySingle(
+            r'select <cal::date_duration>$time;', {'time': res[0]});
         expect(res2, res[0]);
       }
     } finally {

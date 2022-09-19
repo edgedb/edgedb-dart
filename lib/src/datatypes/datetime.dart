@@ -188,8 +188,11 @@ class LocalTime extends Comparable<LocalTime> {
   /// Returns the time in the format `HH:MM:SS[.ssssss]`.
   @override
   String toString() {
-    final time = _date.toString().split(' ').last;
-    return time.substring(0, time.length - 1);
+    return _date
+        .toString()
+        .split(' ')
+        .last
+        .replaceFirst(RegExp(r'\.?0*Z$'), '');
   }
 }
 
@@ -322,8 +325,7 @@ class LocalDateTime extends Comparable<LocalDateTime> {
   /// Returns the date in the format `YYYY-MM-DD'T'HH:MM:SS[.ssssss]`.
   @override
   String toString() {
-    final dateStr = _date.toString().replaceFirst(' ', 'T');
-    return dateStr.substring(0, dateStr.length - 1);
+    return _date.toIso8601String().replaceFirst(RegExp(r'\.?0*Z$'), '');
   }
 }
 
@@ -436,7 +438,7 @@ class RelativeDuration {
     }
 
     final y = years;
-    final m = _months - y;
+    final m = _months - y * 12;
     final d = _days;
     var str =
         'P${y != 0 ? '${y}Y' : ''}${m != 0 ? '${m}M' : ''}${d != 0 ? '${d}D' : ''}';
@@ -446,7 +448,7 @@ class RelativeDuration {
       us -= h * Duration.microsecondsPerHour;
       final min = us ~/ Duration.microsecondsPerMinute;
       us -= min * Duration.microsecondsPerMinute;
-      final s = us ~/ Duration.millisecondsPerSecond;
+      final s = us ~/ Duration.microsecondsPerSecond;
       us -= s * Duration.microsecondsPerSecond;
       str += 'T${h != 0 ? '${h}H' : ''}${min != 0 ? '${min}M' : ''}';
       if (s != 0 || us != 0) {
@@ -518,7 +520,7 @@ class DateDuration {
     }
 
     final y = years;
-    final m = _months - y;
+    final m = _months - y * 12;
     final d = _days;
     return 'P${y != 0 ? '${y}Y' : ''}${m != 0 ? '${m}M' : ''}${d != 0 ? '${d}D' : ''}';
   }
