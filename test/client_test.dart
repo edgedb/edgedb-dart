@@ -496,10 +496,32 @@ void main() {
     }
   });
 
-  test(
-      skip: 'DateDuration type unimplemented',
-      "fetch: date_duration",
-      () async {});
+  test("fetch: date_duration", () async {
+    final con = getClient();
+
+    try {
+      for (var time in [
+        "1 day",
+        "-752043 days",
+        "20 years 5 days",
+        "3 months",
+        "7 weeks",
+      ]) {
+        var res = await con.querySingle(r'''
+          select (
+            <cal::date_duration><str>$time,
+            <str><cal::date_duration><str>$time,
+          );''', {time});
+        expect(res[0].toString(), res[1]);
+
+        var res2 = await con
+            .querySingle(r'select <cal::date_duration>$time;', {time: res[0]});
+        expect(res2, res[0]);
+      }
+    } finally {
+      await con.close();
+    }
+  });
 
   test("fetch: tuple", () async {
     final client = getClient();
