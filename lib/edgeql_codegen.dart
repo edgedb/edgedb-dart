@@ -79,7 +79,6 @@ import 'package:edgedb/src/errors/base.dart';
 import 'package:edgedb/src/options.dart';
 import 'package:edgedb/src/primitives/types.dart';
 import 'package:edgedb/src/tcp_proto.dart';
-import 'package:edgedb/src/utils/pretty_print_error.dart';
 import 'package:path/path.dart';
 
 Builder edgeqlCodegenBuilder(BuilderOptions options) =>
@@ -113,8 +112,6 @@ class EdgeqlCodegenBuilder implements Builder {
           expectedCardinality: Cardinality.many,
           state: Session.defaults(),
           privilegedMode: false);
-    } on EdgeDBError catch (err) {
-      throw prettyPrintError(err, query);
     } finally {
       await holder.release();
     }
@@ -125,6 +122,13 @@ class EdgeqlCodegenBuilder implements Builder {
     }
 
     final fileName = basenameWithoutExtension(buildStep.inputId.path);
+
+    if (RegExp(r'^(\d|_)|[^0-9A-Za-z_]').hasMatch(fileName)) {
+      throw ArgumentError(
+          'only filenames containing A-Z, a-z, 0-9 and _ are supported',
+          fileName);
+    }
+
     final typeName = fileName[0].toUpperCase() + fileName.substring(1);
 
     final file = LibraryBuilder();
@@ -377,6 +381,6 @@ _WalkCodecReturn _walkCodec(Codec codec, Cardinality card,
 
 ClientPool? _connPool;
 final _connPoolResource = Resource(() async {
-  return _connPool ??= ClientPool(TCPProtocol.create, ConnectConfig(),
-      concurrency: 5, exposeErrorAttrs: true);
+  return _connPool ??=
+      ClientPool(TCPProtocol.create, ConnectConfig(), concurrency: 5);
 }, beforeExit: () => _connPool?.close());

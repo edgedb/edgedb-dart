@@ -321,6 +321,55 @@ class ResolvedConnectConfig {
   int get waitUntilAvailable {
     return _waitUntilAvailable?.value ?? 30000;
   }
+
+  String explainConfig() {
+    final output = [
+      'Parameter     Value                                     Source',
+      '---------     -----                                     ------',
+    ];
+
+    outputLine(String param, dynamic val, SourcedValue? rawVal) {
+      final isDefault = rawVal == null;
+      final maxValLength = 40 - (isDefault ? 10 : 0);
+      var value = val.toString();
+      if (value.length > maxValLength) {
+        value = '${value.substring(0, maxValLength - 3)}...';
+      }
+      output.add(param.padRight(14, " ") +
+          (value + (isDefault ? " (default)" : "")).padRight(42, " ") +
+          (rawVal?.source ?? 'default'));
+    }
+
+    outputLine("host", address.host, _host);
+    outputLine("port", address.port, _port);
+    outputLine(
+      "database",
+      database,
+      _database,
+    );
+    outputLine(
+      "user",
+      user,
+      _user,
+    );
+    outputLine(
+      "password",
+      password?.substring(0, 3).padRight(password!.length, "*"),
+      _password,
+    );
+    outputLine(
+      "tlsCAData",
+      _tlsCAData?.value.replaceAll(RegExp(r'\r\n?|\n'), ""),
+      _tlsCAData,
+    );
+    outputLine(
+      "tlsSecurity",
+      tlsSecurity,
+      _tlsSecurity,
+    );
+
+    return output.join("\n");
+  }
 }
 
 Future<String> stashPath(String projectDir) async {

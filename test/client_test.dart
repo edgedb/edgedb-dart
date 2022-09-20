@@ -689,11 +689,10 @@ void main() {
           1000000);
 
       // A 100mb string.
-      // TODO: fix this
-      // await expectLater(
-      //     client.querySingle("select str_repeat('aa', <int64>(10^8));"),
-      //     throwsA(isA<InternalClientError>().having(
-      //         (e) => e.message, 'message', contains('message too big'))));
+      await expectLater(
+          client.querySingle("select str_repeat('aa', <int64>(10^8));"),
+          throwsA(isA<EdgeDBError>().having(
+              (e) => e.message, 'message', contains('message too big'))));
     } finally {
       await client.close();
     }
@@ -954,6 +953,28 @@ void main() {
             client.querySingle('SELECT 2 + 2')
           ]),
           [3, 4]);
+    } finally {
+      await client.close();
+    }
+  });
+
+  test('pretty error message', () async {
+    final client = getClient();
+
+    try {
+      await expectLater(
+          client.query('''
+select {
+  ver := sys::get_version(),
+  unknown := .abc,
+};'''),
+          throwsA(isA<InvalidReferenceError>()
+              .having((e) => e.toString(), 'error message', '''
+InvalidReferenceError: object type 'std::FreeObject' has no link or property 'abc'
+   |
+ 3 |   unknown := .abc,
+   |              ^^^^
+''')));
     } finally {
       await client.close();
     }

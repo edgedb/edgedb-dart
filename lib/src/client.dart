@@ -250,17 +250,14 @@ class ClientPool<Connection extends BaseProtocol> {
   final ConnectConfig _connectConfig;
   Future<ResolvedConnectConfig>? _resolvedConnectConfig;
   final _codecsRegistry = CodecsRegistry();
-  bool? _exposeErrorAttrs;
 
-  ClientPool(this._createConnection, this._connectConfig,
-      {int? concurrency, bool? exposeErrorAttrs}) {
+  ClientPool(this._createConnection, this._connectConfig, {int? concurrency}) {
     if (concurrency != null && concurrency <= 0) {
       throw InterfaceError(
           "invalid 'concurrency' value: expected int greater than 0 (got $concurrency)");
     }
 
     _userConcurrency = concurrency;
-    _exposeErrorAttrs = exposeErrorAttrs;
 
     _resizeHolderPool();
   }
@@ -314,6 +311,8 @@ class ClientPool<Connection extends BaseProtocol> {
     }
   }
 
+  bool _firstConnection = true;
+
   Future<Connection> getNewConnection() async {
     if (_closing != null && _closing!.isCompleted) {
       throw InterfaceError('The client is closed');
@@ -321,8 +320,12 @@ class ClientPool<Connection extends BaseProtocol> {
 
     final config =
         await (_resolvedConnectConfig ??= parseConnectConfig(_connectConfig));
+
+    final logAttempts = _firstConnection;
+    _firstConnection = false;
     final connection = await retryingConnect(
-        _createConnection, config, _codecsRegistry, _exposeErrorAttrs);
+        _createConnection, config, _codecsRegistry,
+        logAttempts: logAttempts);
 
     final suggestedConcurrency =
         connection.serverSettings.suggestedPoolConcurrency;
