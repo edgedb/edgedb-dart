@@ -9,44 +9,36 @@ Future<Connection> retryingConnect<Connection extends BaseProtocol>(
     CreateConnection<Connection> createConnection,
     ResolvedConnectConfig config,
     CodecsRegistry registry,
-    bool? exposeErrorAttrs) async {
+    {required bool logAttempts}) async {
   final waitMilliseconds = config.waitUntilAvailable;
   final timeout = Stopwatch()..start();
+  int? lastLoggingAt;
+
   while (true) {
     try {
       return await createConnection(
-          config: config,
-          registry: registry,
-          exposeErrorAttrs: exposeErrorAttrs);
+        config: config,
+        registry: registry,
+      );
     } on ClientConnectionError catch (e) {
+      if (logAttempts && lastLoggingAt == null) {
+        print(
+            'Connection attempt failed with the following config:\n${config.explainConfig()}');
+      }
       if (timeout.elapsedMilliseconds < waitMilliseconds &&
           e.hasTag(EdgeDBErrorTag.shouldReconnect)) {
-        print(e);
+        if (logAttempts &&
+            (lastLoggingAt == null ||
+                timeout.elapsedMilliseconds - lastLoggingAt > 10000)) {
+          lastLoggingAt = timeout.elapsedMilliseconds;
+
+          print('Attempting reconnection for the next '
+              '${((waitMilliseconds - timeout.elapsedMilliseconds) / 1000).round()}s, '
+              'due to waitUntilAvailable=${waitMilliseconds}ms');
+        }
+
         await Future.delayed(
             Duration(milliseconds: 10 + Random().nextInt(200)));
-        // if (
-        //   config.logging &&
-        //   (!lastLoggingAt || now - lastLoggingAt > 5000)
-        // ) {
-        //   lastLoggingAt = now;
-        //   const logMsg = [
-        //     `A client connection error occurred; reconnecting because ` +
-        //       `of "waitUntilAvailable=${config.connectionParams.waitUntilAvailable}".`,
-        //     e,
-        //   ];
-
-        //   if (config.inProject && !config.fromProject && !config.fromEnv) {
-        //     logMsg.push(
-        //       `\n\n\n` +
-        //         `Hint: it looks like the program is running from a ` +
-        //         `directory initialized with "edgedb project init". ` +
-        //         `Consider calling "edgedb.connect()" without arguments.` +
-        //         `\n`
-        //     );
-        //   }
-        //   // tslint:disable-next-line: no-console
-        //   console.warn(...logMsg);
-        // }
       } else {
         rethrow;
       }

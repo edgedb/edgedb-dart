@@ -56,8 +56,7 @@ typedef CreateConnection<Connection extends BaseProtocol>
     = Future<Connection> Function(
         {required ResolvedConnectConfig config,
         required CodecsRegistry registry,
-        Duration? timeout,
-        bool? exposeErrorAttrs});
+        Duration? timeout});
 
 class ParseResult {
   final Cardinality cardinality;
@@ -99,7 +98,6 @@ abstract class BaseProtocol {
   TransactionStatus transactionStatus = TransactionStatus.idle;
   String? lastStatus;
   ProtocolVersion protocolVersion = protoVer;
-  bool exposeErrorAttrs;
   final serverSettings = ServerSettings();
   late final MessageTransport transport;
   final CodecsRegistry codecsRegistry;
@@ -112,9 +110,7 @@ abstract class BaseProtocol {
 
   BaseProtocol(
       {required TransportCreator transportCreator,
-      required this.codecsRegistry,
-      bool? exposeErrorAttrs})
-      : exposeErrorAttrs = exposeErrorAttrs ?? false {
+      required this.codecsRegistry}) {
     transport = transportCreator(
         onClose: onClose,
         onError: onError,
@@ -238,7 +234,7 @@ abstract class BaseProtocol {
     message.finishMessage();
   }
 
-  Error parseErrorMessage(ReadMessageBuffer message) {
+  EdgeDBError parseErrorMessage(ReadMessageBuffer message) {
     message.discard(1); // ignore severity
     final errCode = message.readUint32();
     final errMessage = message.readString();
@@ -246,13 +242,10 @@ abstract class BaseProtocol {
     final errorType = resolveErrorCode(errCode);
     final err = errorType(errMessage);
 
-    if (exposeErrorAttrs) {
-      final attrs = message.readHeaders().map((key, value) => MapEntry(
-          errorAttrsByCode[key] ?? ErrorAttr.unknown, utf8.decode(value)));
-      setErrorAttrs(err, attrs);
-    } else {
-      message.ignoreHeaders();
-    }
+    final attrs = message.readHeaders().map((key, value) => MapEntry(
+        errorAttrsByCode[key] ?? ErrorAttr.unknown, utf8.decode(value)));
+    setErrorAttrs(err, attrs);
+
     message.finishMessage();
 
     if (err is AuthenticationError) {
@@ -524,6 +517,7 @@ abstract class BaseProtocol {
         case MessageType.ErrorResponse:
           {
             error = parseErrorMessage(message);
+            setErrorQuery(error as EdgeDBError, query);
             break;
           }
 
@@ -656,6 +650,7 @@ abstract class BaseProtocol {
         case MessageType.ErrorResponse:
           {
             error = parseErrorMessage(message);
+            setErrorQuery(error as EdgeDBError, query);
             break;
           }
 

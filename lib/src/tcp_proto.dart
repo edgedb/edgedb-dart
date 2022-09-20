@@ -23,16 +23,16 @@ enum AuthenticationStatus {
 }
 
 class TCPProtocol extends BaseProtocol {
-  TCPProtocol(
-      {required super.transportCreator,
-      required super.codecsRegistry,
-      super.exposeErrorAttrs});
+  TCPProtocol({
+    required super.transportCreator,
+    required super.codecsRegistry,
+  });
 
-  static Future<TCPProtocol> create(
-      {required ResolvedConnectConfig config,
-      required CodecsRegistry registry,
-      Duration? timeout,
-      bool? exposeErrorAttrs}) async {
+  static Future<TCPProtocol> create({
+    required ResolvedConnectConfig config,
+    required CodecsRegistry registry,
+    Duration? timeout,
+  }) async {
     final address = config.address;
     try {
       final sock = await SecureSocket.connect(address.host, address.port,
@@ -47,9 +47,9 @@ class TCPProtocol extends BaseProtocol {
       }
 
       final conn = TCPProtocol(
-          transportCreator: transportCreator(sock, sock),
-          codecsRegistry: registry,
-          exposeErrorAttrs: exposeErrorAttrs);
+        transportCreator: transportCreator(sock, sock),
+        codecsRegistry: registry,
+      );
 
       await conn._connectHandshake(
           database: config.database,
