@@ -111,4 +111,9 @@ class ArrayCodec<T> extends Codec {
   String toString() {
     return 'ArrayCodec ($tid) $length {\n  ${indent(subCodec.toString())}\n}';
   }
+
+  @override
+  bool compare(Codec codec) {
+    return codec is ArrayCodec && codec.subCodec.compare(subCodec);
+  }
 }
