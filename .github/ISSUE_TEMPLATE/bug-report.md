@@ -1,10 +1,9 @@
 ---
 name: Bug report
 about: Report a bug in the client library API
-title: ''
-labels: ''
-assignees: ''
-
+title: ""
+labels: ""
+assignees: ""
 ---
 
 **Describe the bug**
@@ -21,13 +20,15 @@ Include the code that is causing the error:
 A clear and concise description of what you expected to happen. If applicable, add screenshots to help explain your problem.
 
 **Versions (please complete the following information):**
+
 <!--
 For EdgeDB version: Run `edgedb` from your project directory copying the first line of output or query `select sys::get_version_as_str();`
 For EdgeDB CLI version: Run `edgedb --version` from anywhere
 For `edgedb-dart` version: Run `dart pub deps -s compact` from your project directory and look for `edgedb`.
 For Dart version: Run `dart --version`
 -->
-- OS (e.g. iOS):
+
+- OS:
 - EdgeDB version:
 - EdgeDB CLI version:
 - `edgedb-dart` version:
