@@ -67,6 +67,19 @@ class TupleCodec extends Codec {
             '${indent(subCodec.toString())}\n').join('')}'
         '}';
   }
+
+  @override
+  bool compare(Codec codec) {
+    if (codec is! TupleCodec || codec.subCodecs.length != subCodecs.length) {
+      return false;
+    }
+    for (var i = 0; i < subCodecs.length; i++) {
+      if (!subCodecs[i].compare(codec.subCodecs[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
 }
 
 final emptyTupleCodecBuffer = (WriteBuffer()
@@ -99,6 +112,11 @@ class EmptyTupleCodec extends Codec {
           'cannot decode empty Tuple: expected 0 elements, received $els');
     }
     return [];
+  }
+
+  @override
+  bool compare(Codec codec) {
+    return codec is EmptyTupleCodec;
   }
 }
 

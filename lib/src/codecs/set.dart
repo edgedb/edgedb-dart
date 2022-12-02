@@ -119,4 +119,9 @@ class SetCodec<T> extends Codec {
   String toString() {
     return 'SetCodec ($tid) {\n  ${indent(subCodec.toString())}\n}';
   }
+
+  @override
+  bool compare(Codec codec) {
+    return codec is SetCodec && codec.subCodec.compare(codec.subCodec);
+  }
 }

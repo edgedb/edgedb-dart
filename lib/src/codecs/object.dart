@@ -150,4 +150,19 @@ class ObjectCodec extends Codec {
             ' ${indent(field.codec.toString())}\n').join('')}'
         '}';
   }
+
+  @override
+  bool compare(Codec codec) {
+    if (codec is! ObjectCodec || codec.fields.length != fields.length) {
+      return false;
+    }
+    for (var i = 0; i < fields.length; i++) {
+      if (fields[i].name != codec.fields[i].name ||
+          fields[i].cardinality != codec.fields[i].cardinality ||
+          !fields[i].codec.compare(codec.fields[i].codec)) {
+        return false;
+      }
+    }
+    return true;
+  }
 }

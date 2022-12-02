@@ -75,4 +75,18 @@ class NamedTupleCodec extends Codec {
             '${indent(field.codec.toString())}\n').join('')}'
         '}';
   }
+
+  @override
+  bool compare(Codec codec) {
+    if (codec is! NamedTupleCodec || codec.fields.length != fields.length) {
+      return false;
+    }
+    for (var i = 0; i < fields.length; i++) {
+      if (fields[i].name != codec.fields[i].name ||
+          !fields[i].codec.compare(codec.fields[i].codec)) {
+        return false;
+      }
+    }
+    return true;
+  }
 }

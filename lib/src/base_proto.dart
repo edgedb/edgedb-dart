@@ -382,6 +382,7 @@ abstract class BaseProtocol {
 
   Future<dynamic> fetch<T>(
       {required String query,
+      String? queryName,
       dynamic args,
       required OutputFormat outputFormat,
       required Cardinality expectedCardinality,
@@ -400,7 +401,7 @@ abstract class BaseProtocol {
     var cacheItem = queryCodecCache.get(key);
 
     ParseResult? parseResult;
-    if ((cacheItem == null && args != null) ||
+    if ((inCodec == null && cacheItem == null && args != null) ||
         (stateCodec == invalidCodec && state != Session.defaults())) {
       parseResult = await parse(
           query: query,
@@ -412,6 +413,7 @@ abstract class BaseProtocol {
     try {
       await execute(
           query: query,
+          queryName: queryName,
           args: args,
           outputFormat: outputFormat,
           expectedCardinality: expectedCardinality,
@@ -424,18 +426,31 @@ abstract class BaseProtocol {
               parseResult?.outCodec ??
               cacheItem?.outCodec ??
               nullCodec,
+          updateCodecIds: outCodec != null,
           result: ret,
           privilegedMode: privilegedMode);
     } on ParameterTypeMismatchError {
       cacheItem = queryCodecCache.get(key)!;
+      if (inCodec != null) {
+        if (cacheItem.inCodec.compare(inCodec)) {
+          inCodec.updateTid(cacheItem.inCodec);
+        } else {
+          throw InterfaceError(
+              'query parameter types for query "$queryName" do not '
+              'match query parameter types from codegen. '
+              'Re-run `dart run build_runner build`.');
+        }
+      }
       await execute(
           query: query,
+          queryName: queryName,
           args: args,
           outputFormat: outputFormat,
           expectedCardinality: expectedCardinality,
           state: state,
           inCodec: inCodec ?? parseResult?.inCodec ?? cacheItem.inCodec,
           outCodec: outCodec ?? parseResult?.outCodec ?? cacheItem.outCodec,
+          updateCodecIds: outCodec != null,
           result: ret,
           privilegedMode: privilegedMode);
     }
@@ -556,6 +571,7 @@ abstract class BaseProtocol {
 
   Future<void> execute({
     required String query,
+    String? queryName,
     dynamic args,
     required OutputFormat outputFormat,
     required Cardinality expectedCardinality,
@@ -563,6 +579,7 @@ abstract class BaseProtocol {
     required bool privilegedMode,
     required Codec inCodec,
     required Codec outCodec,
+    required bool updateCodecIds,
     required List<dynamic> result,
     // options?: ParseOptions
   }) async {
@@ -580,8 +597,8 @@ abstract class BaseProtocol {
         privilegedMode: privilegedMode);
 
     wb
-      ..writeBuffer(inCodec.tidBuffer)
-      ..writeBuffer(outCodec.tidBuffer);
+      ..writeBuffer(inCodec.updatedTidBuffer ?? inCodec.tidBuffer)
+      ..writeBuffer(outCodec.updatedTidBuffer ?? outCodec.tidBuffer);
 
     _encodeArgs(wb, inCodec, args);
 
@@ -634,7 +651,19 @@ abstract class BaseProtocol {
               final key =
                   _getQueryCacheKey(query, outputFormat, expectedCardinality);
               queryCodecCache.set(key, parseResult);
-              outCodec = parseResult.outCodec;
+
+              if (updateCodecIds) {
+                if (parseResult.outCodec.compare(outCodec)) {
+                  outCodec.updateTid(parseResult.outCodec);
+                } else {
+                  throw InterfaceError(
+                      'return type response for query "$queryName" does not '
+                      'match return type from codegen. '
+                      'Re-run `dart run build_runner build`.');
+                }
+              } else {
+                outCodec = parseResult.outCodec;
+              }
             } catch (e) {
               error = e as Error;
             }
@@ -663,12 +692,14 @@ abstract class BaseProtocol {
       if (error is StateMismatchError) {
         return execute(
           query: query,
+          queryName: queryName,
           args: args,
           outputFormat: outputFormat,
           expectedCardinality: expectedCardinality,
           state: state,
           inCodec: inCodec,
           outCodec: outCodec,
+          updateCodecIds: updateCodecIds,
           result: result,
           privilegedMode: privilegedMode,
         );

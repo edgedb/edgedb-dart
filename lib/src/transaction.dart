@@ -192,6 +192,7 @@ class Transaction implements Executor {
         methodName,
         () async => await _conn.fetch<T>(
             query: query,
+            queryName: methodName,
             args: args,
             outputFormat: OutputFormat.binary,
             expectedCardinality: resultCard,

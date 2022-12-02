@@ -99,4 +99,9 @@ class RangeCodec<T> extends Codec {
   String toString() {
     return 'RangeCodec ($tid) {\n  ${indent(subCodec.toString())}\n}';
   }
+
+  @override
+  bool compare(Codec codec) {
+    return codec is RangeCodec && subCodec.compare(codec.subCodec);
+  }
 }

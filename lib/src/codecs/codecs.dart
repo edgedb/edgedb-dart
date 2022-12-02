@@ -34,6 +34,14 @@ abstract class Codec {
         growable: false));
   }
 
+  String? updatedTid;
+  Uint8List? updatedTidBuffer;
+
+  void updateTid(Codec codec) {
+    updatedTid = codec.tid;
+    updatedTidBuffer = codec.tidBuffer;
+  }
+
   void encode(WriteBuffer buf, dynamic object);
   dynamic decode(ReadBuffer buf);
 
@@ -41,6 +49,9 @@ abstract class Codec {
   String toString() {
     return '$runtimeType ($tid)';
   }
+
+  /// Returns `true` if [codec] is equivalent to this codec.
+  bool compare(Codec codec);
 }
 
 abstract class ScalarCodec extends Codec {
@@ -51,6 +62,11 @@ abstract class ScalarCodec extends Codec {
 
   derive(String tid) {
     return _scalarCodecConstructors[this.tid]!(this.tid);
+  }
+
+  @override
+  bool compare(Codec codec) {
+    return codec is ScalarCodec && codec.tid == tid;
   }
 }
 
@@ -65,6 +81,11 @@ class NullCodec extends Codec {
   @override
   dynamic decode(ReadBuffer buf) {
     throw InternalClientError("null codec cannot used to decode data");
+  }
+
+  @override
+  bool compare(Codec codec) {
+    return codec is NullCodec;
   }
 }
 

@@ -65,4 +65,17 @@ class SparseObjectCodec extends Codec {
 
     return result;
   }
+
+  @override
+  bool compare(Codec codec) {
+    if (codec is! SparseObjectCodec || codec.codecs.length != codecs.length) {
+      return false;
+    }
+    for (var i = 0; i < codecs.length; i++) {
+      if (names[i] != codec.names[i] || !codecs[i].compare(codec.codecs[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
 }
