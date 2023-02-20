@@ -276,10 +276,10 @@ void main() {
     }
   });
 
-  test("fetch: tuples in args", () async {
-    if (getServerVersion() < ServerVersion(3, 0)) {
-      return;
-    }
+  test("fetch: tuples in args",
+      skip: getServerVersion() < ServerVersion(3, 0)
+          ? 'tuple args only supported in EdgeDB >= 3.0'
+          : null, () async {
     final client = getClient();
     try {
       final tests = <String, List<dynamic>>{
