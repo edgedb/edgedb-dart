@@ -556,14 +556,17 @@ void main() {
               (e) => e.message,
               'message',
               contains(
-                  'a Map<String, dynamic> was expected, got "List<Object>"'))));
+                  'a Map<String, dynamic> or EdgeDBNamedTuple was expected, got "List<Object>"'))));
 
       await expectLater(
           client.query(r'select <tuple<str, int64>>$test', {
             'test': {'a': 'str', 'b': 123}
           }),
-          throwsA(isA<QueryArgumentError>().having((e) => e.message, 'message',
-              contains('a List was expected, got "_Map<String, Object>"'))));
+          throwsA(isA<QueryArgumentError>().having(
+              (e) => e.message,
+              'message',
+              contains(
+                  'a List or EdgeDBTuple was expected, got "_Map<String, Object>"'))));
 
       await expectLater(
           client.query(r'select <tuple<a: str, b: int64>>$test', {
