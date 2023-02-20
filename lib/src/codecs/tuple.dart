@@ -26,6 +26,10 @@ import 'consts.dart';
 
 typedef TupleReturnTypeConstructor = dynamic Function(List<dynamic>);
 
+abstract class EdgeDBTuple {
+  List<dynamic> toList();
+}
+
 class TupleCodec extends Codec {
   final List<Codec> subCodecs;
   final TupleReturnTypeConstructor? returnType;
@@ -34,21 +38,23 @@ class TupleCodec extends Codec {
 
   @override
   void encode(WriteBuffer buf, dynamic object) {
-    if (object is! List) {
+    if (object is! List && object is! EdgeDBTuple) {
       throw InvalidArgumentError(
-          'a List was expected, got "${object.runtimeType}"');
+          'a List or EdgeDBTuple was expected, got "${object.runtimeType}"');
     }
+
+    final els = object is EdgeDBTuple ? object.toList() : object as List;
 
     final elsLen = subCodecs.length;
 
-    if (object.length != elsLen) {
+    if (els.length != elsLen) {
       throw QueryArgumentError(
-          'expected $elsLen element${elsLen == 1 ? "" : "s"} in Tuple, got ${object.length}');
+          'expected $elsLen element${elsLen == 1 ? "" : "s"} in Tuple, got ${els.length}');
     }
 
     final elemData = WriteBuffer();
     for (var i = 0; i < elsLen; i++) {
-      final el = object[i];
+      final el = els[i];
 
       if (el == null) {
         throw MissingArgumentError(

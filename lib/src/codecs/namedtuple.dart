@@ -23,6 +23,10 @@ import '../primitives/buffer.dart';
 import '../utils/indent.dart';
 import 'codecs.dart';
 
+abstract class EdgeDBNamedTuple {
+  Map<String, dynamic> toMap();
+}
+
 class NamedTupleField {
   final String name;
   final Codec codec;
@@ -41,21 +45,25 @@ class NamedTupleCodec extends Codec {
 
   @override
   void encode(WriteBuffer buf, dynamic object) {
-    if (object is! Map<String, dynamic>) {
+    if (object is! Map<String, dynamic> && object is! EdgeDBNamedTuple) {
       throw InvalidArgumentError(
-          'a Map<String, dynamic> was expected, got "${object.runtimeType}"');
+          'a Map<String, dynamic> or EdgeDBNamedTuple was expected, got "${object.runtimeType}"');
     }
+
+    final els = object is EdgeDBNamedTuple
+        ? object.toMap()
+        : object as Map<String, dynamic>;
 
     final elsLen = fields.length;
 
-    if (object.length != elsLen) {
+    if (els.length != elsLen) {
       throw QueryArgumentError(
-          'expected $elsLen element${elsLen == 1 ? "" : "s"} in NamedTuple, got ${object.length}');
+          'expected $elsLen element${elsLen == 1 ? "" : "s"} in NamedTuple, got ${els.length}');
     }
 
     final elemData = WriteBuffer();
     for (var field in fields) {
-      final el = object[field.name];
+      final el = els[field.name];
 
       if (el == null) {
         throw MissingArgumentError(
