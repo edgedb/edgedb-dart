@@ -16,6 +16,8 @@
  * limitations under the License.
  */
 
+import 'dart:typed_data';
+
 import '../errors/errors.dart';
 import '../primitives/buffer.dart';
 import '../utils/indent.dart';
@@ -39,8 +41,40 @@ class NamedTupleCodec extends Codec {
 
   @override
   void encode(WriteBuffer buf, dynamic object) {
-    throw InvalidArgumentError(
-        'Named tuples cannot be passed in query arguments');
+    if (object is! Map<String, dynamic>) {
+      throw InvalidArgumentError(
+          'a Map<String, dynamic> was expected, got "${object.runtimeType}"');
+    }
+
+    final elsLen = fields.length;
+
+    if (object.length != elsLen) {
+      throw QueryArgumentError(
+          'expected $elsLen element${elsLen == 1 ? "" : "s"} in NamedTuple, got ${object.length}');
+    }
+
+    final elemData = WriteBuffer();
+    for (var field in fields) {
+      final el = object[field.name];
+
+      if (el == null) {
+        throw MissingArgumentError(
+            "element '${field.name}' in NamedTuple cannot be 'null'");
+      } else {
+        elemData.writeInt32(0); // reserved
+        try {
+          field.codec.encode(elemData, el);
+        } on QueryArgumentError catch (e) {
+          throw InvalidArgumentError(
+              "invalid element '${field.name}' in NamedTuple: ${e.message}");
+        }
+      }
+    }
+
+    final elemBuf = elemData.unwrap();
+    buf.writeInt32(4 + elemBuf.length);
+    buf.writeInt32(elsLen);
+    buf.writeBuffer(elemBuf as Uint8List);
   }
 
   @override

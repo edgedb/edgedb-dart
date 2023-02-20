@@ -49,7 +49,7 @@ Now you're ready to start making queries:
 
 ```dart
 void main() async {
-  final movie = client.querySingle(r'''
+  final movie = await client.querySingle(r'''
     select Movie {
       title,
       release_year,

@@ -16,6 +16,8 @@
  * limitations under the License.
  */
 
+import 'dart:typed_data';
+
 import '../errors/errors.dart';
 import '../primitives/buffer.dart';
 import '../utils/indent.dart';
@@ -32,7 +34,40 @@ class TupleCodec extends Codec {
 
   @override
   void encode(WriteBuffer buf, dynamic object) {
-    throw InvalidArgumentError("Tuples cannot be passed in query arguments");
+    if (object is! List) {
+      throw InvalidArgumentError(
+          'a List was expected, got "${object.runtimeType}"');
+    }
+
+    final elsLen = subCodecs.length;
+
+    if (object.length != elsLen) {
+      throw QueryArgumentError(
+          'expected $elsLen element${elsLen == 1 ? "" : "s"} in Tuple, got ${object.length}');
+    }
+
+    final elemData = WriteBuffer();
+    for (var i = 0; i < elsLen; i++) {
+      final el = object[i];
+
+      if (el == null) {
+        throw MissingArgumentError(
+            "element at index $i in Tuple cannot be 'null'");
+      } else {
+        elemData.writeInt32(0); // reserved
+        try {
+          subCodecs[i].encode(elemData, el);
+        } on QueryArgumentError catch (e) {
+          throw InvalidArgumentError(
+              'invalid element at index $i in Tuple: ${e.message}');
+        }
+      }
+    }
+
+    final elemBuf = elemData.unwrap();
+    buf.writeInt32(4 + elemBuf.length);
+    buf.writeInt32(elsLen);
+    buf.writeBuffer(elemBuf as Uint8List);
   }
 
   @override
