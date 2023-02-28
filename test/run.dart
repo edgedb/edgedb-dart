@@ -174,19 +174,20 @@ Future<Client> setupServer(ConnectConfig config) async {
   final client = createClient(concurrency: 1, config: config);
 
   try {
-    await client.execute('create database dart_test');
-    await client.execute('''
-      create superuser role dart_test {
-        set password := 'darttest'
-      };
-    ''');
-    await client.execute('''
-      configure instance insert Auth {
-        user := 'dart_test',
-        priority := 10,
-        method := (insert SCRAM),
-      };
-    ''');
+    // setup example db for codegen tests
+    await client.execute('create database codegen');
+    final codegenClient = createClient(config: config, database: 'codegen');
+    try {
+      final migrationsDir = Directory('./example/dbschema/migrations');
+      final migrationFiles = (await migrationsDir.list().toList())
+        ..sort((a, b) => basename(a.path).compareTo(basename(b.path)));
+
+      for (var file in migrationFiles) {
+        await codegenClient.execute(await File(file.path).readAsString());
+      }
+    } finally {
+      await codegenClient.close();
+    }
   } catch (e) {
     await client.close();
     rethrow;
