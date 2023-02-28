@@ -144,6 +144,7 @@ class ClientConnectionHolder<Connection extends BaseProtocol> {
 
   Future<dynamic> _retryingFetch<T>(
       {required String query,
+      String? queryName,
       dynamic args,
       required OutputFormat outputFormat,
       required Cardinality expectedCardinality,
@@ -155,6 +156,7 @@ class ClientConnectionHolder<Connection extends BaseProtocol> {
       try {
         result = await conn.fetch<T>(
             query: query,
+            queryName: queryName,
             args: args,
             outputFormat: outputFormat,
             expectedCardinality: expectedCardinality,
@@ -754,6 +756,7 @@ class Client implements Executor {
     try {
       return await holder._retryingFetch<T>(
           query: query,
+          queryName: methodName,
           args: args,
           outputFormat: OutputFormat.binary,
           expectedCardinality: resultCard,
