@@ -48,7 +48,7 @@ void main() {
         await runWithEnv(
             env: testcase['env'] != null ? Map.castFrom(testcase['env']) : {},
             homedir: testcase['homeDir'] as String?, () async {
-          expect(await searchConfigDir(await stashPath(testcase['project'])),
+          expect(await searchConfigDir(await getStashPath(testcase['project'])),
               testcase['result']);
         });
       }
@@ -118,6 +118,9 @@ final errorMapping = {
   'invalid_tls_security': RegExp(
       r"^invalid 'tlsSecurity' value|'tlsSecurity' value cannot be lower than security level set by EDGEDB_CLIENT_SECURITY"),
   'exclusive_options': RegExp(r"^Cannot specify both .* and .*"),
+  'secret_key_not_found':
+      RegExp(r"^Cannot connect to cloud instances without a secret key"),
+  'invalid_secret_key': RegExp(r"^Invalid secret key"),
 };
 
 Future<void> runConnectionTest(Map<String, dynamic> testcase) async {
@@ -148,7 +151,10 @@ Future<void> runConnectionTest(Map<String, dynamic> testcase) async {
     opts['waitUntilAvailable'] = parseDuration(opts['waitUntilAvailable']);
   }
 
-  final config = ConnectConfig.fromJson(opts ?? {});
+  final config = ConnectConfig.fromJson({
+    ...(opts ?? {}),
+    'instanceName': opts?['instance'],
+  });
 
   if (fs != null &&
       ((platform == null && (Platform.isWindows || Platform.isMacOS)) ||
@@ -184,6 +190,7 @@ Future<void> runConnectionTest(Map<String, dynamic> testcase) async {
         'database': params.database,
         'user': params.user,
         'password': params.password,
+        'secretKey': params.secretKey,
         'tlsCAData': debugGetRawCAData(params),
         'tlsSecurity': params.tlsSecurity.value,
         'serverSettings': params.serverSettings,
@@ -230,8 +237,9 @@ Future<void> runWithEnv(Future<void> Function() body,
         final filepath = entry.key.replaceAll(
             r'${HASH}', hashProjectPath(entry.value['project-path']));
         mockedFiles[filepath] = '';
-        mockedFiles[join(filepath, 'instance-name')] =
-            entry.value['instance-name'];
+        for (var entry in entry.value.entries) {
+          mockedFiles[join(filepath, entry.key)] = entry.value;
+        }
       }
     }
   }

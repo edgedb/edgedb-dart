@@ -4,6 +4,7 @@ import 'dart:developer';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:edgedb/src/utils/crc_hqx.dart';
 import 'package:path/path.dart';
 
 import 'credentials.dart';
@@ -47,6 +48,7 @@ class ConnectConfig {
   String? database;
   String? user;
   String? password;
+  String? secretKey;
   Map<String, String>? serverSettings;
   String? tlsCA;
   String? tlsCAFile;
@@ -63,6 +65,7 @@ class ConnectConfig {
       this.database,
       this.user,
       this.password,
+      this.secretKey,
       this.serverSettings,
       this.tlsCA,
       this.tlsCAFile,
@@ -79,6 +82,7 @@ class ConnectConfig {
         database = json['database'],
         user = json['user'],
         password = json['password'],
+        secretKey = json['secretKey'],
         serverSettings = json['serverSettings'] != null
             ? Map.castFrom(json['serverSettings'])
             : null,
@@ -104,6 +108,7 @@ class ConnectConfig {
       'database': database,
       'user': user,
       'password': password,
+      'secretKey': secretKey,
       'serverSettings': serverSettings,
       'tlsCA': tlsCA,
       'tlsCAFile': tlsCAFile,
@@ -138,6 +143,8 @@ class ResolvedConnectConfig {
   SourcedValue<String>? _database;
   SourcedValue<String>? _user;
   SourcedValue<String>? _password;
+  SourcedValue<String>? _secretKey;
+  SourcedValue<String>? _cloudProfile;
   SourcedValue<String>? _tlsCAData;
   SourcedValue<TLSSecurity>? _tlsSecurity;
   SourcedValue<int>? _waitUntilAvailable;
@@ -177,6 +184,18 @@ class ResolvedConnectConfig {
   void setPassword(SourcedValue<String?> password) {
     if (_password == null && password.value != null) {
       _password = SourcedValue.from(password);
+    }
+  }
+
+  void setSecretKey(SourcedValue<String?> secretKey) {
+    if (_secretKey == null && secretKey.value != null) {
+      _secretKey = SourcedValue.from(secretKey);
+    }
+  }
+
+  void setCloudProfile(SourcedValue<String?> cloudProfile) {
+    if (_cloudProfile == null && cloudProfile.value != null) {
+      _cloudProfile = SourcedValue.from(cloudProfile);
     }
   }
 
@@ -276,6 +295,14 @@ class ResolvedConnectConfig {
     return _password?.value;
   }
 
+  String? get secretKey {
+    return _secretKey?.value;
+  }
+
+  String? get cloudProfile {
+    return _cloudProfile?.value ?? 'default';
+  }
+
   TLSSecurity get tlsSecurity {
     return _tlsSecurity != null &&
             _tlsSecurity!.value != TLSSecurity.defaultSecurity
@@ -372,7 +399,7 @@ class ResolvedConnectConfig {
   }
 }
 
-Future<String> stashPath(String projectDir) async {
+Future<String> getStashPath(String projectDir) async {
   var projectPath = await Directory(projectDir).resolveSymbolicLinks();
   if (Platform.isWindows && !projectPath.startsWith('\\\\')) {
     projectPath = '\\\\?\\$projectPath';
@@ -479,7 +506,8 @@ Future<ResolvedConnectConfig> parseConnectConfig(ConnectConfig config) async {
   var hasCompoundOptions = await resolveConfigOptions(
     resolvedConfig,
     "Cannot have more than one of the following connection options: "
-    "'dsnOrInstanceName', 'credentials', 'credentialsFile' or 'host'/'port'",
+    "'dsn', 'instanceName', 'credentials', 'credentialsFile' or 'host'/'port'",
+    null,
     dsn: sourcedDsn,
     instanceName: sourcedInstance,
     credentials: SourcedValue(config.credentials, "'credentials' option"),
@@ -490,6 +518,7 @@ Future<ResolvedConnectConfig> parseConnectConfig(ConnectConfig config) async {
     database: SourcedValue(config.database, "'database' option"),
     user: SourcedValue(config.user, "'user' option"),
     password: SourcedValue(config.password, "'password' option"),
+    secretKey: SourcedValue(config.secretKey, "'secretKey' option"),
     tlsCA: SourcedValue(config.tlsCA, "'tlsCA' option"),
     tlsCAFile: SourcedValue(config.tlsCAFile, "'tlsCAFile' option"),
     tlsSecurity: SourcedValue(config.tlsSecurity, "'tlsSecurity' option"),
@@ -515,6 +544,7 @@ Future<ResolvedConnectConfig> parseConnectConfig(ConnectConfig config) async {
       "Cannot have more than one of the following connection environment variables: "
       "'EDGEDB_DSN', 'EDGEDB_INSTANCE', 'EDGEDB_CREDENTIALS', "
       "'EDGEDB_CREDENTIALS_FILE' or 'EDGEDB_HOST'",
+      null,
       dsn: SourcedValue(
           getEnvVar('EDGEDB_DSN'), "'EDGEDB_DSN' environment variable"),
       instanceName: SourcedValue(getEnvVar('EDGEDB_INSTANCE'),
@@ -532,6 +562,10 @@ Future<ResolvedConnectConfig> parseConnectConfig(ConnectConfig config) async {
           getEnvVar('EDGEDB_USER'), "'EDGEDB_USER' environment variable"),
       password: SourcedValue(getEnvVar('EDGEDB_PASSWORD'),
           "'EDGEDB_PASSWORD' environment variable"),
+      secretKey: SourcedValue(getEnvVar('EDGEDB_SECRET_KEY'),
+          "'EDGEDB_SECRET_KEY' environment variable"),
+      cloudProfile: SourcedValue(getEnvVar('EDGEDB_CLOUD_PROFILE'),
+          "'EDGEDB_CLOUD_PROFILE' environment variable"),
       tlsCA: SourcedValue(
           getEnvVar('EDGEDB_TLS_CA'), "'EDGEDB_TLS_CA' environment variable"),
       tlsCAFile: SourcedValue(getEnvVar('EDGEDB_TLS_CA_FILE'),
@@ -553,14 +587,21 @@ Future<ResolvedConnectConfig> parseConnectConfig(ConnectConfig config) async {
           " variables EDGEDB_HOST, EDGEDB_INSTANCE, EDGEDB_DSN, "
           "EDGEDB_CREDENTIALS or EDGEDB_CREDENTIALS_FILE");
     }
-    final instancePath = await searchConfigDir(
-        join(await stashPath(projectDir), 'instance-name'));
+    final stashPath = await getStashPath(projectDir);
+    final instancePath =
+        await searchConfigDir(join(stashPath, 'instance-name'));
     final instName = (await readFileOrNull(instancePath))?.trim();
 
     if (instName != null) {
-      await resolveConfigOptions(resolvedConfig, '',
+      final cloudProfile = (await readFileOrNull(
+              await searchConfigDir(join(stashPath, 'cloud-profile'))))
+          ?.trim();
+
+      await resolveConfigOptions(resolvedConfig, '', stashPath,
           instanceName:
-              SourcedValue(instName, "project linked instance ('$instName')"));
+              SourcedValue(instName, "project linked instance ('$instName')"),
+          cloudProfile: SourcedValue(
+              cloudProfile, "project defined cloud instance('$cloudProfile')"));
     } else {
       throw ClientConnectionError(
           "Found 'edgedb.toml' but the project is not initialized. "
@@ -582,8 +623,8 @@ Future<String?> readFileOrNull(String path) async {
   }
 }
 
-Future<bool> resolveConfigOptions(
-    ResolvedConnectConfig resolvedConfig, String compoundParamsError,
+Future<bool> resolveConfigOptions(ResolvedConnectConfig resolvedConfig,
+    String compoundParamsError, String? stashPath,
     {SourcedValue<String?>? dsn,
     SourcedValue<String?>? instanceName,
     SourcedValue<String?>? credentials,
@@ -593,6 +634,8 @@ Future<bool> resolveConfigOptions(
     SourcedValue<String?>? database,
     SourcedValue<String?>? user,
     SourcedValue<String?>? password,
+    SourcedValue<String?>? secretKey,
+    SourcedValue<String?>? cloudProfile,
     SourcedValue<String?>? tlsCA,
     SourcedValue<String?>? tlsCAFile,
     SourcedValue<dynamic>? tlsSecurity,
@@ -606,6 +649,8 @@ Future<bool> resolveConfigOptions(
   if (database != null) resolvedConfig.setDatabase(database);
   if (user != null) resolvedConfig.setUser(user);
   if (password != null) resolvedConfig.setPassword(password);
+  if (secretKey != null) resolvedConfig.setSecretKey(secretKey);
+  if (cloudProfile != null) resolvedConfig.setCloudProfile(cloudProfile);
   if (tlsCA != null) resolvedConfig.setTlsCAData(tlsCA);
   if (tlsCAFile != null) await resolvedConfig.setTlsCAFile(tlsCAFile);
   if (tlsSecurity != null) resolvedConfig.setTlsSecurity(tlsSecurity);
@@ -651,10 +696,15 @@ Future<bool> resolveConfigOptions(
       } else {
         var credsFile = credentialsFile?.value;
         if (credsFile == null) {
-          if (!RegExp(r'^[A-Za-z_][A-Za-z_0-9]*$')
+          if (!RegExp(r'^[A-Za-z_]\w*(/[A-Za-z_]\w*)?$')
               .hasMatch(instanceName!.value!)) {
             throw InterfaceError(
                 "invalid DSN or instance name: '${instanceName.value}'");
+          }
+          if (instanceName.value!.contains('/')) {
+            await parseCloudInstanceNameIntoConfig(
+                resolvedConfig, SourcedValue.from(instanceName), stashPath);
+            return true;
           }
           credsFile = await getCredentialsPath(instanceName.value!);
           source = instanceName.source;
@@ -788,6 +838,9 @@ Future<void> parseDSNIntoConfig(
       config._password,
       (password) => config.setPassword(SourcedValue.from(password)));
 
+  await handleDSNPart('secret_key', null, config._secretKey,
+      (secretKey) => config.setSecretKey(SourcedValue.from(secretKey)));
+
   await handleDSNPart('tls_ca', null, config._tlsCAData,
       (caData) => config.setTlsCAData(SourcedValue.from(caData)));
 
@@ -798,4 +851,50 @@ Future<void> parseDSNIntoConfig(
       config.setWaitUntilAvailable);
 
   config.addServerSettings(searchParams);
+}
+
+Future<void> parseCloudInstanceNameIntoConfig(ResolvedConnectConfig config,
+    SourcedValue<String> cloudInstanceName, String? stashPath) async {
+  String? secretKey = config.secretKey;
+  if (secretKey == null) {
+    try {
+      final profile = config.cloudProfile;
+      final profilePath =
+          await searchConfigDir(join('cloud-credentials', '$profile.json'));
+      final fileData = await File(profilePath).readAsString();
+
+      secretKey = json.decode(fileData)['secret_key']!;
+
+      config.setSecretKey(
+          SourcedValue(secretKey, "cloud-credentials/$profile.json"));
+    } catch (e) {
+      throw InterfaceError(
+          'Cannot connect to cloud instances without a secret key');
+    }
+  }
+
+  try {
+    final keyParts = secretKey!.split('.');
+    if (keyParts.length < 2) {
+      throw InterfaceError('Invalid secret key: does not contain payload');
+    }
+    final dnsZone = _jwtBase64Decode(keyParts[1])["iss"] as String;
+    final dnsBucket = (crcHqx(utf8.encode(cloudInstanceName.value), 0) % 100)
+        .toString()
+        .padLeft(2, '0');
+    final instanceParts = cloudInstanceName.value.split('/');
+    final host =
+        "${instanceParts[1]}--${instanceParts[0]}.c-$dnsBucket.i.$dnsZone";
+    config.setHost(SourcedValue(
+        host, "resolved from 'secretKey' and ${cloudInstanceName.source}"));
+  } on EdgeDBError {
+    rethrow;
+  } catch (e) {
+    throw InterfaceError('Invalid secret key: $e');
+  }
+}
+
+dynamic _jwtBase64Decode(String payload) {
+  return json.decode(utf8.decode(
+      base64.decode(payload.padRight((payload.length ~/ 4 + 1) * 4, '='))));
 }

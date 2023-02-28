@@ -24,12 +24,12 @@ class FileMock implements File {
   }
 
   @override
-  Future<File> create({bool recursive = false}) {
+  Future<File> create({bool exclusive = false, bool recursive = false}) {
     throw UnimplementedError();
   }
 
   @override
-  void createSync({bool recursive = false}) {}
+  void createSync({bool exclusive = false, bool recursive = false}) {}
 
   @override
   Future<FileSystemEntity> delete({bool recursive = false}) {

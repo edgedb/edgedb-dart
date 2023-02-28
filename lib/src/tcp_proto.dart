@@ -93,15 +93,27 @@ class TCPProtocol extends BaseProtocol {
   Future<void> _connectHandshake(
       {required String database,
       required String user,
-      String? password}) async {
+      String? password,
+      String? secretKey}) async {
     final handshake = WriteMessageBuffer(ClientMessageType.ClientHandshake)
       ..writeInt16(protoVer.hi)
-      ..writeInt16(protoVer.lo)
-      ..writeInt16(2)
-      ..writeString('user')
-      ..writeString(user)
-      ..writeString('database')
-      ..writeString(database)
+      ..writeInt16(protoVer.lo);
+
+    final params = {
+      'user': user,
+      'database': database,
+    };
+    if (secretKey != null) {
+      params['token'] = secretKey;
+    }
+
+    handshake.writeInt16(params.length);
+    for (var param in params.entries) {
+      handshake
+        ..writeString(param.key)
+        ..writeString(param.value);
+    }
+    handshake
       ..writeInt16(0)
       ..endMessage();
 
