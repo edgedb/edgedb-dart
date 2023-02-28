@@ -3,8 +3,9 @@ import 'dart:io';
 
 import 'package:edgedb/edgedb.dart';
 
-Client getClient({int? concurrency}) {
-  return createClient(config: _getOpts(), concurrency: concurrency);
+Client getClient({int? concurrency, String? database}) {
+  return createClient(
+      config: getClientConfig(), concurrency: concurrency, database: database);
 }
 
 class ServerVersion {
@@ -49,7 +50,7 @@ ServerVersion getServerVersion() {
 }
 
 ConnectConfig? _config;
-ConnectConfig _getOpts() {
+ConnectConfig getClientConfig() {
   if (_config != null) {
     return _config!;
   }

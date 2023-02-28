@@ -208,11 +208,16 @@ class EdgeqlCodegenBuilder implements Builder {
                         .property(parseResult.cardinality.name),
                     Reference('_query'),
                     inCodec != null
-                        ? literalMap({
-                            for (var field in inCodec.fields)
-                              literalString(field.name): Reference(
-                                  namedArgs ? field.name : '\$${field.name}')
-                          }, Reference('String'), Reference('dynamic'))
+                        ? (namedArgs
+                            ? literalMap({
+                                for (var field in inCodec.fields)
+                                  literalString(field.name):
+                                      Reference(field.name)
+                              }, Reference('String'), Reference('dynamic'))
+                            : literalList([
+                                for (var field in inCodec.fields)
+                                  Reference('\$${field.name}')
+                              ], Reference('dynamic')))
                         : literalNull
                   ], {}, [
                     returnType.typeRef
