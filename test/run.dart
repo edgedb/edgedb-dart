@@ -180,13 +180,13 @@ Future<Client> setupServer(ConnectConfig config) async {
     try {
       final migrationsDir = Directory('./example/dbschema/migrations');
       final migrationFiles = (await migrationsDir.list().toList())
-        ..sort((a, b) => basename(a.path).compareTo(b.path));
+        ..sort((a, b) => basename(a.path).compareTo(basename(b.path)));
+
       for (var file in migrationFiles) {
         await codegenClient.execute(await File(file.path).readAsString());
       }
-    } catch (e) {
+    } finally {
       await codegenClient.close();
-      rethrow;
     }
   } catch (e) {
     await client.close();
