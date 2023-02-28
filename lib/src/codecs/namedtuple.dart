@@ -16,10 +16,16 @@
  * limitations under the License.
  */
 
+import 'dart:typed_data';
+
 import '../errors/errors.dart';
 import '../primitives/buffer.dart';
 import '../utils/indent.dart';
 import 'codecs.dart';
+
+abstract class EdgeDBNamedTuple {
+  Map<String, dynamic> toMap();
+}
 
 class NamedTupleField {
   final String name;
@@ -39,8 +45,44 @@ class NamedTupleCodec extends Codec {
 
   @override
   void encode(WriteBuffer buf, dynamic object) {
-    throw InvalidArgumentError(
-        'Named tuples cannot be passed in query arguments');
+    if (object is! Map<String, dynamic> && object is! EdgeDBNamedTuple) {
+      throw InvalidArgumentError(
+          'a Map<String, dynamic> or EdgeDBNamedTuple was expected, got "${object.runtimeType}"');
+    }
+
+    final els = object is EdgeDBNamedTuple
+        ? object.toMap()
+        : object as Map<String, dynamic>;
+
+    final elsLen = fields.length;
+
+    if (els.length != elsLen) {
+      throw QueryArgumentError(
+          'expected $elsLen element${elsLen == 1 ? "" : "s"} in NamedTuple, got ${els.length}');
+    }
+
+    final elemData = WriteBuffer();
+    for (var field in fields) {
+      final el = els[field.name];
+
+      if (el == null) {
+        throw MissingArgumentError(
+            "element '${field.name}' in NamedTuple cannot be 'null'");
+      } else {
+        elemData.writeInt32(0); // reserved
+        try {
+          field.codec.encode(elemData, el);
+        } on QueryArgumentError catch (e) {
+          throw InvalidArgumentError(
+              "invalid element '${field.name}' in NamedTuple: ${e.message}");
+        }
+      }
+    }
+
+    final elemBuf = elemData.unwrap();
+    buf.writeInt32(4 + elemBuf.length);
+    buf.writeInt32(elsLen);
+    buf.writeBuffer(elemBuf as Uint8List);
   }
 
   @override

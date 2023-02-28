@@ -20,12 +20,15 @@ void main(List<String> testArgs) async {
 
   final adminConn = await setupServer(server.config);
 
+  final version = await adminConn.querySingle('select sys::get_version()');
+
   final testProc = await Process.start('dart', [
     'test',
     if (Platform.environment['GITHUB_ACTIONS'] != 'true') '--reporter=expanded',
     ...testArgs
   ], environment: {
-    '_DART_EDGEDB_CONNECT_CONFIG': jsonEncode(server.config)
+    '_DART_EDGEDB_CONNECT_CONFIG': jsonEncode(server.config),
+    '_DART_EDGEDB_VERSION': jsonEncode([version['major'], version['minor']])
   });
 
   testProc.stdout.listen((event) => stdout.add(event));

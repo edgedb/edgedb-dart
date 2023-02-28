@@ -276,6 +276,326 @@ void main() {
     }
   });
 
+  test("fetch: tuples in args",
+      skip: getServerVersion() < ServerVersion(3, 0)
+          ? 'tuple args only supported in EdgeDB >= 3.0'
+          : null, () async {
+    final client = getClient();
+    try {
+      final tests = <String, List<dynamic>>{
+        // Basic tuples
+        'tuple<str, bool>': [
+          ['x', true],
+          ['y', false]
+        ],
+        'optional tuple<str, bool>': [
+          ['x', true],
+          null
+        ],
+        // Some pointlessly nested tuples
+        'tuple<tuple<str, bool>>': [
+          [
+            ['x', true]
+          ]
+        ],
+        'tuple<tuple<str, bool>, int64>': [
+          [
+            ['x', true],
+            1
+          ]
+        ],
+        // Basic array examples
+        'array<tuple<int64, str>>': [
+          [],
+          [
+            [0, 'zero']
+          ],
+          [
+            [0, 'zero'],
+            [1, 'one']
+          ],
+        ],
+        'optional array<tuple<int64, str>>': [
+          null,
+          [],
+          [
+            [0, 'zero']
+          ],
+          [
+            [0, 'zero'],
+            [1, 'one']
+          ],
+        ],
+        'array<tuple<str, array<int64>>>': [
+          [],
+          [
+            ['x', []]
+          ],
+          [
+            [
+              'x',
+              [1]
+            ]
+          ],
+          [
+            ['x', []],
+            ['y', []],
+            ['z', []]
+          ],
+          [
+            [
+              'x',
+              [1]
+            ],
+            ['y', []],
+            ['z', []]
+          ],
+          [
+            ['x', []],
+            [
+              'y',
+              [1]
+            ],
+            ['z', []]
+          ],
+          [
+            ['x', []],
+            ['y', []],
+            [
+              'z',
+              [1]
+            ]
+          ],
+          [
+            ['x', []],
+            [
+              'y',
+              [1, 2]
+            ],
+            [
+              'z',
+              [1, 2, 3]
+            ]
+          ],
+        ],
+        // Arrays of pointlessly nested tuples
+        'array<tuple<tuple<str, bool>, int64>>': [
+          [],
+          [
+            [
+              ['x', true],
+              1
+            ]
+          ],
+          [
+            [
+              ['x', true],
+              1
+            ],
+            [
+              ['z', false],
+              2
+            ]
+          ],
+        ],
+        'array<tuple<tuple<array<str>, bool>, int64>>': [
+          [],
+          [
+            [
+              [[], true],
+              1
+            ]
+          ],
+          [
+            [
+              [
+                ['x', 'y', 'z'],
+                true
+              ],
+              1
+            ],
+            [
+              [
+                ['z'],
+                false
+              ],
+              2
+            ]
+          ],
+        ],
+        // Named tuples
+        'tuple<a: str, b: bool>': [
+          {'a': 'x', 'b': true}
+        ],
+        'optional tuple<a: str, b: bool>': [
+          {'a': 'x', 'b': true},
+          null
+        ],
+        'tuple<x: tuple<a: str, b: bool>>': [
+          {
+            'x': {'a': 'x', 'b': true}
+          }
+        ],
+        'tuple<x: tuple<a: str, b: bool>, y: int64>': [
+          {
+            'x': {'a': 'x', 'b': true},
+            'y': 1
+          }
+        ],
+        'array<tuple<a: int64, b: str>>': [
+          [],
+          [
+            {'a': 0, 'b': 'zero'}
+          ],
+          [
+            {'a': 0, 'b': 'zero'},
+            {'a': 1, 'b': 'one'}
+          ],
+        ],
+        'optional array<tuple<a: int64, b: str>>': [
+          null,
+          [],
+          [
+            {'a': 0, 'b': 'zero'}
+          ],
+          [
+            {'a': 0, 'b': 'zero'},
+            {'a': 1, 'b': 'one'}
+          ],
+        ],
+        'array<tuple<a: str, b: array<int64>>>': [
+          [],
+          [
+            {'a': 'x', 'b': []}
+          ],
+          [
+            {
+              'a': 'x',
+              'b': [1]
+            }
+          ],
+          [
+            {'a': 'x', 'b': []},
+            {'a': 'y', 'b': []},
+            {'a': 'z', 'b': []}
+          ],
+          [
+            {
+              'a': 'x',
+              'b': [1]
+            },
+            {'a': 'y', 'b': []},
+            {'a': 'z', 'b': []}
+          ],
+          [
+            {'a': 'x', 'b': []},
+            {
+              'a': 'y',
+              'b': [1]
+            },
+            {'a': 'z', 'b': []}
+          ],
+          [
+            {'a': 'x', 'b': []},
+            {'a': 'y', 'b': []},
+            {
+              'a': 'z',
+              'b': [1]
+            }
+          ],
+          [
+            {'a': 'x', 'b': []},
+            {
+              'a': 'y',
+              'b': [1, 2]
+            },
+            {
+              'a': 'z',
+              'b': [1, 2, 3]
+            }
+          ],
+        ],
+      };
+
+      for (var entry in tests.entries) {
+        for (var input in entry.value) {
+          expect(await client.querySingle('select <${entry.key}>\$0', [input]),
+              input);
+        }
+      }
+
+      await expectLater(
+          client.query(r'select <tuple<str, int64>>$test', {
+            'test': ['str', 123, 456]
+          }),
+          throwsA(isA<QueryArgumentError>().having((e) => e.message, 'message',
+              contains('expected 2 elements in Tuple, got 3'))));
+
+      await expectLater(
+          client.query(r'select <tuple<str, int64>>$test', {
+            'test': ['str', '123']
+          }),
+          throwsA(isA<QueryArgumentError>().having(
+              (e) => e.message,
+              'message',
+              contains(
+                  'invalid element at index 1 in Tuple: an int was expected, got String'))));
+
+      await expectLater(
+          client.query(r'select <tuple<str, int64>>$test', {
+            'test': ['str', null]
+          }),
+          throwsA(isA<QueryArgumentError>().having((e) => e.message, 'message',
+              contains("element at index 1 in Tuple cannot be 'null'"))));
+
+      await expectLater(
+          client.query(r'select <tuple<a: str, b: int64>>$test', {
+            'test': ['str', 123]
+          }),
+          throwsA(isA<QueryArgumentError>().having(
+              (e) => e.message,
+              'message',
+              contains(
+                  'a Map<String, dynamic> or EdgeDBNamedTuple was expected, got "List<Object>"'))));
+
+      await expectLater(
+          client.query(r'select <tuple<str, int64>>$test', {
+            'test': {'a': 'str', 'b': 123}
+          }),
+          throwsA(isA<QueryArgumentError>().having(
+              (e) => e.message,
+              'message',
+              contains(
+                  'a List or EdgeDBTuple was expected, got "_Map<String, Object>"'))));
+
+      await expectLater(
+          client.query(r'select <tuple<a: str, b: int64>>$test', {
+            'test': {'a': 'str', 'b': 123, 'c': 456}
+          }),
+          throwsA(isA<QueryArgumentError>().having((e) => e.message, 'message',
+              contains('expected 2 elements in NamedTuple, got 3'))));
+
+      await expectLater(
+          client.query(r'select <tuple<a: str, b: int64>>$test', {
+            'test': {'a': 'str', 'b': '123'}
+          }),
+          throwsA(isA<QueryArgumentError>().having(
+              (e) => e.message,
+              'message',
+              contains(
+                  "invalid element 'b' in NamedTuple: an int was expected, got String"))));
+
+      await expectLater(
+          client.query(r'select <tuple<a: str, b: int64>>$test', {
+            'test': {'a': 'str', 'b': null}
+          }),
+          throwsA(isA<QueryArgumentError>().having((e) => e.message, 'message',
+              contains("element 'b' in NamedTuple cannot be 'null'"))));
+    } finally {
+      await client.close();
+    }
+  });
+
   test("fetch: datetime", () async {
     final client = getClient();
     try {

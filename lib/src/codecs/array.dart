@@ -33,8 +33,10 @@ class ArrayCodec<T> extends Codec {
   void encode(WriteBuffer buf, dynamic object) {
     if (!(subCodec is ScalarCodec ||
         subCodec is TupleCodec ||
+        subCodec is NamedTupleCodec ||
         subCodec is RangeCodec)) {
-      throw InvalidArgumentError("only arrays of scalars are supported");
+      throw InvalidArgumentError(
+          "only arrays of scalars or tuples are supported");
     }
 
     if (object is! List) {
