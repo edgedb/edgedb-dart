@@ -104,6 +104,7 @@ final errorMapping = {
   'invalid_credentials_file': RegExp(r"^cannot read credentials file"),
   'invalid_dsn_or_instance_name': RegExp(r"^invalid DSN or instance name"),
   'invalid_dsn': RegExp(r"^invalid DSN"),
+  'invalid_instance_name': RegExp(r"^invalid instance name"),
   'unix_socket_unsupported': RegExp(r"^unix socket paths not supported"),
   'invalid_port': RegExp(r"^invalid port"),
   'invalid_host': RegExp(r"^invalid host"),
