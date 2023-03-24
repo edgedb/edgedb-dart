@@ -13,6 +13,8 @@ import 'platform.dart';
 import 'utils/env.dart';
 import 'utils/parse_duration.dart';
 
+const domainNameMaxLen = 63;
+
 class Address {
   String host;
   int port;
@@ -696,18 +698,20 @@ Future<bool> resolveConfigOptions(ResolvedConnectConfig resolvedConfig,
       } else {
         var credsFile = credentialsFile?.value;
         if (credsFile == null) {
-          if (!RegExp(r'^[A-Za-z_]\w*(/[A-Za-z_]\w*)?$')
+          if (RegExp(r'^\w(-?\w)*$')
               .hasMatch(instanceName!.value!)) {
-            throw InterfaceError(
-                "invalid DSN or instance name: '${instanceName.value}'");
-          }
-          if (instanceName.value!.contains('/')) {
+            credsFile = await getCredentialsPath(instanceName.value!);
+            source = instanceName.source;
+          } else {
+            if (!RegExp(r'^([A-Za-z0-9](-?[A-Za-z0-9])*)/([A-Za-z0-9](-?[A-Za-z0-9])*)$')
+                .hasMatch(instanceName!.value!)) {
+              throw InterfaceError(
+                  "invalid DSN or instance name: '${instanceName.value}'");
+            }
             await parseCloudInstanceNameIntoConfig(
                 resolvedConfig, SourcedValue.from(instanceName), stashPath);
             return true;
           }
-          credsFile = await getCredentialsPath(instanceName.value!);
-          source = instanceName.source;
         } else {
           source = credentialsFile!.source;
         }
@@ -843,6 +847,8 @@ Future<void> parseDSNIntoConfig(
 
   await handleDSNPart('tls_ca', null, config._tlsCAData,
       (caData) => config.setTlsCAData(SourcedValue.from(caData)));
+  await handleDSNPart('tls_ca_file', null, config._tlsCAData,
+      (caFile) => config.setTlsCAFile(SourcedValue.from(caFile)));
 
   await handleDSNPart(
       'tls_security', null, config._tlsSecurity, config.setTlsSecurity);
@@ -855,6 +861,14 @@ Future<void> parseDSNIntoConfig(
 
 Future<void> parseCloudInstanceNameIntoConfig(ResolvedConnectConfig config,
     SourcedValue<String> cloudInstanceName, String? stashPath) async {
+  final instanceParts = cloudInstanceName.value.split('/');
+  final domainName = '${instanceParts[1]}--${instanceParts[0]}';
+  if (domainName.length > domainNameMaxLen) {
+    throw InterfaceError(
+        'invalid instance name: cloud instance name length cannot '
+        'exceed ${domainNameMaxLen - 1} characters: $cloudInstanceName');
+  }
+
   String? secretKey = config.secretKey;
   if (secretKey == null) {
     try {
@@ -882,9 +896,8 @@ Future<void> parseCloudInstanceNameIntoConfig(ResolvedConnectConfig config,
     final dnsBucket = (crcHqx(utf8.encode(cloudInstanceName.value), 0) % 100)
         .toString()
         .padLeft(2, '0');
-    final instanceParts = cloudInstanceName.value.split('/');
-    final host =
-        "${instanceParts[1]}--${instanceParts[0]}.c-$dnsBucket.i.$dnsZone";
+
+    final host = "$domainName.c-$dnsBucket.i.$dnsZone";
     config.setHost(SourcedValue(
         host, "resolved from 'secretKey' and ${cloudInstanceName.source}"));
   } on EdgeDBError {
