@@ -698,18 +698,20 @@ Future<bool> resolveConfigOptions(ResolvedConnectConfig resolvedConfig,
       } else {
         var credsFile = credentialsFile?.value;
         if (credsFile == null) {
-          if (!RegExp(r'^(\w(-?\w)*)(/(\w(-?\w)*))?$')
+          if (RegExp(r'^\w(-?\w)*$')
               .hasMatch(instanceName!.value!)) {
-            throw InterfaceError(
-                "invalid DSN or instance name: '${instanceName.value}'");
-          }
-          if (instanceName.value!.contains('/')) {
+            credsFile = await getCredentialsPath(instanceName.value!);
+            source = instanceName.source;
+          } else {
+            if (!RegExp(r'^([A-Za-z0-9](-?[A-Za-z0-9])*)/([A-Za-z0-9](-?[A-Za-z0-9])*)$')
+                .hasMatch(instanceName!.value!)) {
+              throw InterfaceError(
+                  "invalid DSN or instance name: '${instanceName.value}'");
+            }
             await parseCloudInstanceNameIntoConfig(
                 resolvedConfig, SourcedValue.from(instanceName), stashPath);
             return true;
           }
-          credsFile = await getCredentialsPath(instanceName.value!);
-          source = instanceName.source;
         } else {
           source = credentialsFile!.source;
         }
