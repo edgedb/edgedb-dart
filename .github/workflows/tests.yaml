@@ -42,9 +42,8 @@ jobs:
       - name: Install dependencies
         run: dart pub get
 
-      # - name: Lint
-      #   run: |
-      #     dart analyze
+      - name: Lint
+        run: dart analyze
 
       - name: Install EdgeDB
         uses: edgedb/setup-edgedb@v1
