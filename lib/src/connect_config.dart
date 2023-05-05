@@ -698,13 +698,13 @@ Future<bool> resolveConfigOptions(ResolvedConnectConfig resolvedConfig,
       } else {
         var credsFile = credentialsFile?.value;
         if (credsFile == null) {
-          if (RegExp(r'^\w(-?\w)*$')
-              .hasMatch(instanceName!.value!)) {
+          if (RegExp(r'^\w(-?\w)*$').hasMatch(instanceName!.value!)) {
             credsFile = await getCredentialsPath(instanceName.value!);
             source = instanceName.source;
           } else {
-            if (!RegExp(r'^([A-Za-z0-9](-?[A-Za-z0-9])*)/([A-Za-z0-9](-?[A-Za-z0-9])*)$')
-                .hasMatch(instanceName!.value!)) {
+            if (!RegExp(
+                    r'^([A-Za-z0-9](-?[A-Za-z0-9])*)/([A-Za-z0-9](-?[A-Za-z0-9])*)$')
+                .hasMatch(instanceName.value!)) {
               throw InterfaceError(
                   "invalid DSN or instance name: '${instanceName.value}'");
             }
