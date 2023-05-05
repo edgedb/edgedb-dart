@@ -54,7 +54,8 @@ class TCPProtocol extends BaseProtocol {
       await conn._connectHandshake(
           database: config.database,
           user: config.user,
-          password: config.password);
+          password: config.password,
+          secretKey: config.secretKey);
 
       return conn;
     } on SocketException catch (e) {
@@ -104,7 +105,7 @@ class TCPProtocol extends BaseProtocol {
       'database': database,
     };
     if (secretKey != null) {
-      params['token'] = secretKey;
+      params['secret_key'] = secretKey;
     }
 
     handshake.writeInt16(params.length);
