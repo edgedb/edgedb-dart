@@ -7,4 +7,16 @@ on:
 
 jobs:
   publish:
-    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
+    # https://dart.dev/tools/pub/automated-publishing#configuring-a-github-action-workflow-for-publishing-to-pubdev
+    permissions:
+      id-token: write # This is required for authentication using OIDC
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dart-lang/setup-dart@v1
+      - name: Install dependencies
+        run: dart pub get
+        # Remove submodule to make dart pub validation happy
+      - run: rm -r test/shared-client-testcases/
+      - name: Publish
+        run: dart pub publish --force
