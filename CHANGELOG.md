@@ -12,3 +12,8 @@
     the generated query method is run against a different EdgeDB instance from
     the one that was used to run codegen)
   - Fix handling of optional and complex query parameters
+
+# 0.2.1
+
+- Update to handle new instance name rules
+- Fix sending of secret key parameter in connection handshake

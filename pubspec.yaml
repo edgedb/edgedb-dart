@@ -1,6 +1,6 @@
 name: edgedb
 description: Official Dart client library for EdgeDB
-version: 0.2.0
+version: 0.2.1
 homepage: https://www.edgedb.com
 repository: https://github.com/edgedb/edgedb-dart
 
