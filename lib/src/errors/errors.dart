@@ -382,6 +382,13 @@ class DuplicateCastDefinitionError extends DuplicateDefinitionError {
   final code = 0x0405020a;
 }
 
+class DuplicateMigrationError extends DuplicateDefinitionError {
+  DuplicateMigrationError(super.message, [super.source]);
+
+  @override
+  final code = 0x0405020b;
+}
+
 class SessionTimeoutError extends QueryError {
   SessionTimeoutError(super.message, [super.source]);
 
@@ -394,6 +401,9 @@ class IdleSessionTimeoutError extends SessionTimeoutError {
 
   @override
   final code = 0x04060100;
+
+  @override
+  final tags = {EdgeDBErrorTag.shouldRetry};
 }
 
 class QueryTimeoutError extends SessionTimeoutError {
@@ -449,6 +459,13 @@ class AccessPolicyError extends InvalidValueError {
 
   @override
   final code = 0x05010003;
+}
+
+class QueryAssertionError extends InvalidValueError {
+  QueryAssertionError(super.message, [super.source]);
+
+  @override
+  final code = 0x05010004;
 }
 
 class IntegrityError extends ExecutionError {
@@ -514,6 +531,13 @@ class TransactionDeadlockError extends TransactionConflictError {
 
   @override
   final tags = {EdgeDBErrorTag.shouldRetry};
+}
+
+class WatchError extends ExecutionError {
+  WatchError(super.message, [super.source]);
+
+  @override
+  final code = 0x05040000;
 }
 
 class ConfigurationError extends EdgeDBError {
