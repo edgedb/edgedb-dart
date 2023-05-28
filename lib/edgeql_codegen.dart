@@ -333,6 +333,11 @@ _WalkCodecReturn _walkCodec(Codec codec, LibraryBuilder file,
           ..returns = Reference('Map<String, dynamic>')
           ..body = literalMap(namesMap).returned.statement)
         .build());
+    typeClass.methods.add((MethodBuilder()
+          ..name = 'toJson'
+          ..returns = Reference('Map<String, dynamic>')
+          ..body = Reference('toMap').call([]).returned.statement)
+        .build());
 
     final builtClass = typeClass.build();
     if (!omitOutput) {
