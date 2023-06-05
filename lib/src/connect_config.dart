@@ -383,7 +383,9 @@ class ResolvedConnectConfig {
     );
     outputLine(
       "password",
-      password?.substring(0, 3).padRight(password!.length, "*"),
+      password
+          ?.substring(0, (password!.length - 3).clamp(0, 3))
+          .padRight(password!.length, "*"),
       _password,
     );
     outputLine(
