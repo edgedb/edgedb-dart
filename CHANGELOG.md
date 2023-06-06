@@ -17,3 +17,9 @@
 
 - Update to handle new instance name rules
 - Fix sending of secret key parameter in connection handshake
+
+# 0.2.2
+
+- Update EdgeDB error classes
+- Add `toJson` method to codegen result classes
+- Fix bug in connection config explain when password is empty string
