@@ -863,12 +863,13 @@ Future<void> parseDSNIntoConfig(
 
 Future<void> parseCloudInstanceNameIntoConfig(ResolvedConnectConfig config,
     SourcedValue<String> cloudInstanceName, String? stashPath) async {
-  final instanceParts = cloudInstanceName.value.split('/');
+  final normalisedInstanceName = cloudInstanceName.value.toLowerCase();
+  final instanceParts = normalisedInstanceName.split('/');
   final domainName = '${instanceParts[1]}--${instanceParts[0]}';
   if (domainName.length > domainNameMaxLen) {
     throw InterfaceError(
         'invalid instance name: cloud instance name length cannot '
-        'exceed ${domainNameMaxLen - 1} characters: $cloudInstanceName');
+        'exceed ${domainNameMaxLen - 1} characters: ${cloudInstanceName.value}');
   }
 
   String? secretKey = config.secretKey;
@@ -895,7 +896,7 @@ Future<void> parseCloudInstanceNameIntoConfig(ResolvedConnectConfig config,
       throw InterfaceError('Invalid secret key: does not contain payload');
     }
     final dnsZone = _jwtBase64Decode(keyParts[1])["iss"] as String;
-    final dnsBucket = (crcHqx(utf8.encode(cloudInstanceName.value), 0) % 100)
+    final dnsBucket = (crcHqx(utf8.encode(normalisedInstanceName), 0) % 100)
         .toString()
         .padLeft(2, '0');
 
