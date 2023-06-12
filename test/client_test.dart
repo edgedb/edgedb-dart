@@ -1093,6 +1093,44 @@ void main() {
     }
   });
 
+  test("fetch: pgvector",
+      skip: getServerVersion() < ServerVersion(3, 0)
+          ? 'pgvector only supported in EdgeDB >= 3.0'
+          : null, () async {
+    final client = getClient();
+
+    try {
+      await client
+          .withRetryOptions(RetryOptions(attempts: 1))
+          .transaction((tx) async {
+        await tx.execute('create extension pgvector');
+
+        expect(
+            await tx
+                .querySingle(r"select <ext::pgvector::vector>[1.5,2.0,3.8]"),
+            Float32List.fromList([1.5, 2.0, 3.8]));
+
+        expect(
+            await tx.querySingle(r"select <ext::pgvector::vector>$0", [
+              Float32List.fromList([3.0, 9.0, -42.5])
+            ]),
+            Float32List.fromList([3, 9, -42.5]));
+
+        expect(
+            await tx.querySingle(r"select <json><ext::pgvector::vector>$0", [
+              Float32List.fromList([3.0, 9.0, -42.5])
+            ]),
+            '[3, 9, -42.5]');
+
+        throw CancelTransaction();
+      });
+    } on CancelTransaction {
+      // ignore error
+    } finally {
+      await client.close();
+    }
+  });
+
   test("querySingleJSON", () async {
     final client = getClient();
 
