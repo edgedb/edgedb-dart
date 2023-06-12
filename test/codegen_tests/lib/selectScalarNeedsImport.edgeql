@@ -1,0 +1,1 @@
+select b'Hello EdgeDB'

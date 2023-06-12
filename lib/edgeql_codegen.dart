@@ -175,6 +175,7 @@ class EdgeqlCodegenBuilder implements Builder {
                   ..types.add(returnType.typeRef))
                 : TypeReference((ref) => ref
                   ..symbol = returnType.typeRef.symbol
+                  ..url = returnType.typeRef.url
                   ..isNullable =
                       parseResult.cardinality == Cardinality.atMostOne)));
         if (argsClass != null) {
