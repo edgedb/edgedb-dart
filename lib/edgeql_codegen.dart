@@ -242,7 +242,7 @@ class EdgeqlCodegenBuilder implements Builder {
 }
 
 Expression _queryString(String value) {
-  final escaped = value.replaceAll("'''", "\\'''").replaceAll('\$', '\\\$');
+  final escaped = value.replaceAll("'", "\\'").replaceAll('\$', '\\\$');
   return CodeExpression(Code("'''$escaped'''"));
 }
 
