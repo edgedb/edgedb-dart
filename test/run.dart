@@ -73,6 +73,8 @@ List<String> getServerCommand(String statusFile) {
     args = ['wsl', '-u', 'edgedb', ...args];
   }
 
+  print(Process.runSync(args[0], [...args.sublist(1), '--version']).stdout);
+
   final help =
       Process.runSync(args[0], [...args.sublist(1), '--help']).stdout as String;
 
