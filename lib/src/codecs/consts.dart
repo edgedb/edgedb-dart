@@ -23,6 +23,7 @@ const knownTypes = {
   "00000000000000000000000000000111": "cal::relative_duration",
   "00000000000000000000000000000112": "cal::date_duration",
   "00000000000000000000000000000130": "cfg::memory",
+  "9565dd8804f511eea6910b6ebe179825": "ext::pgvector::vector"
 };
 
 final knownTypeNames = {

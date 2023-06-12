@@ -12,6 +12,7 @@ import 'numbers.dart';
 import 'numerics.dart';
 import 'text.dart';
 import 'uuid.dart';
+import 'pgvector.dart';
 
 export 'array.dart';
 export 'enum.dart';
@@ -112,6 +113,7 @@ final _scalarCodecConstructors = {
   'cal::relative_duration': RelativeDurationCodec.new,
   'cal::date_duration': DateDurationCodec.new,
   'cfg::memory': ConfigMemoryCodec.new,
+  'ext::pgvector::vector': PgVectorCodec.new,
 }.map<String, ScalarCodec Function(String)>((typename, type) {
   final id = knownTypeNames[typename];
   if (id == null) {
