@@ -60,6 +60,7 @@ abstract class ScalarCodec extends Codec {
 
   final String returnType = 'dynamic';
   final String? returnTypeImport = null;
+  final String? argType = null;
 
   derive(String tid) {
     return _scalarCodecConstructors[this.tid]!(this.tid);

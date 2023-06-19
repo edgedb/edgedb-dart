@@ -259,8 +259,10 @@ _WalkCodecReturn _walkCodec(Codec codec, LibraryBuilder file,
   if (codec is ScalarCodec) {
     return _WalkCodecReturn(
         TypeReference((ref) => ref
-          ..symbol = codec.returnType
-          ..url = codec.returnTypeImport),
+          ..symbol = (isArgsCodec ? codec.argType : null) ?? codec.returnType
+          ..url = !(isArgsCodec && codec.argType != null)
+              ? codec.returnTypeImport
+              : null),
         codec is EnumCodec
             ? Reference('EnumCodec', 'package:edgedb/src/codecs/codecs.dart')
                 .newInstance([literalString(codec.tid)])
