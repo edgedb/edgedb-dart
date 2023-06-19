@@ -53,8 +53,8 @@
 /// use the [Client.transaction()] API.
 ///
 /// ## Type Conversion
-/// EdgeDB types are decoded into Dart types (or the other way for query
-/// parameters) as follows:
+/// EdgeDB types are decoded into/encoded from Dart types as follows (any types
+/// in parentheses are also valid for query parameters):
 ///
 /// | EdgeDB type                                 | Dart type                     |
 /// |---------------------------------------------|-------------------------------|
@@ -82,6 +82,7 @@
 /// | `cal::relative_duration`                    | [RelativeDuration]            |
 /// | `cal::date_duration`                        | [DateDuration]                |
 /// | `cfg::memory`                               | [ConfigMemory]                |
+/// | `ext::pgvector::vector`                     | [Float32List] ([List<double>])|
 ///
 /// ## Custom types
 /// For EdgeDB types that don't have a built-in Dart type, we provide some
