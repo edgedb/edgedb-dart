@@ -1122,6 +1122,18 @@ void main() {
             ]),
             [3, 9, -42.5]);
 
+        expect(
+            await tx.querySingle(r"select <ext::pgvector::vector>$0", [
+              [3.0, 9.0, -42.5]
+            ]),
+            Float32List.fromList([3, 9, -42.5]));
+
+        expect(
+            await tx.querySingle(r"select <json><ext::pgvector::vector>$0", [
+              [3.0, 9.0, -42.5]
+            ]),
+            [3, 9, -42.5]);
+
         throw CancelTransaction();
       });
     } on CancelTransaction {

@@ -33,16 +33,19 @@ class PgVectorCodec extends ScalarCodec {
   @override
   // ignore: overridden_fields
   final returnTypeImport = 'dart:typed_data';
+  @override
+  // ignore: overridden_fields
+  final argType = 'List<double>';
 
   @override
   void encode(WriteBuffer buf, dynamic object) {
-    if (object is! Float32List) {
+    if (object is! List<double>) {
       throw InvalidArgumentError(
-          'a Float32List was expected, got "${object.runtimeType}"');
+          'a Float32List or List<double> was expected, got "${object.runtimeType}"');
     }
     if (object.length > pgvectorMaxDim) {
       throw InvalidArgumentError(
-          'too many elements in Float32List to encode into pgvector');
+          'too many elements in List to encode into pgvector');
     }
 
     buf
