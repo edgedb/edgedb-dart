@@ -23,3 +23,12 @@
 - Update EdgeDB error classes
 - Add `toJson` method to codegen result classes
 - Fix bug in connection config explain when password is empty string
+
+# 0.3.0
+
+- Fix cloud instance resolution by normalizing cloud instance names to
+  lowercase when computing cloud host
+- Add support for pgvector extension (<https://www.edgedb.com/docs/stdlib/pgvector>)
+- Codegen bug fixes:
+  - Fix query escaping
+  - Fix bug when query returns scalar type that is not a builtin dart type
