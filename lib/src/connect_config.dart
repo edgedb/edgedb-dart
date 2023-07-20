@@ -597,15 +597,22 @@ Future<ResolvedConnectConfig> parseConnectConfig(ConnectConfig config) async {
     final instName = (await readFileOrNull(instancePath))?.trim();
 
     if (instName != null) {
-      final cloudProfile = (await readFileOrNull(
-              await searchConfigDir(join(stashPath, 'cloud-profile'))))
-          ?.trim();
+      final values = await Future.wait([
+        searchConfigDir(join(stashPath, 'cloud-profile'))
+            .then((filepath) => readFileOrNull(filepath)),
+        searchConfigDir(join(stashPath, 'database'))
+            .then((filepath) => readFileOrNull(filepath))
+      ]);
+
+      final cloudProfile = values[0]?.trim();
+      final database = values[1]?.trim();
 
       await resolveConfigOptions(resolvedConfig, '', stashPath,
           instanceName:
               SourcedValue(instName, "project linked instance ('$instName')"),
           cloudProfile: SourcedValue(
-              cloudProfile, "project defined cloud instance('$cloudProfile')"));
+              cloudProfile, "project defined cloud instance('$cloudProfile')"),
+          database: SourcedValue(database, "project default database"));
     } else {
       throw ClientConnectionError(
           "Found 'edgedb.toml' but the project is not initialized. "
