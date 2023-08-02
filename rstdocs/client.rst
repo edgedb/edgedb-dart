@@ -85,6 +85,8 @@ in parentheses are also valid for query parameters):
     - `Map\<String, dynamic\> <https://api.dart.dev/stable/3.1.5/dart-core/Map-class.html>`__
   * - Ranges
     - :ref:`Range\<dynamic\> <edgedb-dart-Range>`
+  * - Multiranges
+    - :ref:`MultiRange\<dynamic\> <edgedb-dart-MultiRange>`
   * - Enums
     - `String <https://api.dart.dev/stable/3.1.5/dart-core/String-class.html>`__
   * - ``str``

@@ -816,6 +816,70 @@ void main() {
     }
   });
 
+  test("fetch: multirange",
+      skip: getServerVersion() < ServerVersion(4, 0)
+          ? 'multiranges only supported in EdgeDB >= 4.0'
+          : null, () async {
+    final samples = [
+      {'in': MultiRange([])},
+      {
+        'in': MultiRange([Range.empty()]),
+        'out': MultiRange([]),
+      },
+      {
+        'in': MultiRange<dynamic>([
+          Range(null, 0),
+          Range(1, 2),
+          Range(4, null),
+        ])
+      },
+      {
+        'in': MultiRange<int>([
+          Range(null, 2, incUpper: true),
+          Range(5, 9),
+          Range(5, 9),
+          Range(5, 9),
+          Range(null, 2, incUpper: true),
+        ]),
+        'out': MultiRange<dynamic>([
+          Range(5, 9),
+          Range(null, 3),
+        ]),
+      },
+      {
+        'in': MultiRange<int>([
+          Range(null, 2),
+          Range(-5, 9),
+          Range(13, null),
+        ]),
+        'out': MultiRange<dynamic>([Range(null, 9), Range(13, null)]),
+      }
+    ];
+
+    final client = getClient();
+
+    try {
+      final result =
+          await client.querySingle(r'SELECT <array<multirange<int32>>>$0', [
+        [
+          MultiRange([Range(1, 2)])
+        ]
+      ]);
+      expect(result, [
+        MultiRange<dynamic>([Range(1, 2)])
+      ]);
+
+      for (var sample in samples) {
+        final result = await client
+            .querySingle(r'select <multirange<int64>>$0', [sample['in']]);
+
+        expect(result, sample['out'] ?? sample['in']);
+      }
+    } finally {
+      await client.close();
+    }
+  });
+
   test("fetch: cal::date_duration", () async {
     final con = getClient();
 

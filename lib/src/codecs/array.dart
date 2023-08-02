@@ -35,7 +35,8 @@ class ArrayCodec<T> extends Codec {
     if (!(subCodec is ScalarCodec ||
         subCodec is TupleCodec ||
         subCodec is NamedTupleCodec ||
-        subCodec is RangeCodec)) {
+        subCodec is RangeCodec ||
+        subCodec is MultiRangeCodec)) {
       throw InvalidArgumentError(
           "only arrays of scalars or tuples are supported");
     }

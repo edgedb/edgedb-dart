@@ -23,6 +23,7 @@ const pageRefs = [
   PageRef(page: "api", type: "class", name: "RetryOptions"),
   PageRef(page: "api", type: "class", name: "TransactionOptions"),
   PageRef(page: "datatypes", type: "class", name: "Range"),
+  PageRef(page: "datatypes", type: "class", name: "MultiRange"),
   PageRef(page: "datatypes", type: "class", name: "ConfigMemory"),
 ];
 
