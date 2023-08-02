@@ -3,7 +3,7 @@ import '../primitives/buffer.dart';
 import 'codecs.dart';
 
 class Int16Codec extends ScalarCodec {
-  Int16Codec(super.tid);
+  Int16Codec(super.tid, super.typeName);
 
   @override
   // ignore: overridden_fields
@@ -26,7 +26,7 @@ class Int16Codec extends ScalarCodec {
 }
 
 class Int32Codec extends ScalarCodec {
-  Int32Codec(super.tid);
+  Int32Codec(super.tid, super.typeName);
 
   @override
   // ignore: overridden_fields
@@ -49,7 +49,7 @@ class Int32Codec extends ScalarCodec {
 }
 
 class Int64Codec extends ScalarCodec {
-  Int64Codec(super.tid);
+  Int64Codec(super.tid, super.typeName);
 
   @override
   // ignore: overridden_fields
@@ -72,7 +72,7 @@ class Int64Codec extends ScalarCodec {
 }
 
 class Float32Codec extends ScalarCodec {
-  Float32Codec(super.tid);
+  Float32Codec(super.tid, super.typeName);
 
   @override
   // ignore: overridden_fields
@@ -95,7 +95,7 @@ class Float32Codec extends ScalarCodec {
 }
 
 class Float64Codec extends ScalarCodec {
-  Float64Codec(super.tid);
+  Float64Codec(super.tid, super.typeName);
 
   @override
   // ignore: overridden_fields

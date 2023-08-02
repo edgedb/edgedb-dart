@@ -23,7 +23,7 @@ import '../primitives/buffer.dart';
 import 'codecs.dart';
 
 class StrCodec extends ScalarCodec {
-  StrCodec(super.tid);
+  StrCodec(super.tid, super.typeName);
 
   @override
   // ignore: overridden_fields

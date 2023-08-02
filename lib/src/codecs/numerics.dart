@@ -7,7 +7,7 @@ const numericNeg = 0x4000;
 final nBase = BigInt.from(10000);
 
 class BigIntCodec extends ScalarCodec {
-  BigIntCodec(super.tid);
+  BigIntCodec(super.tid, super.typeName);
 
   @override
   // ignore: overridden_fields

@@ -158,9 +158,9 @@ class ReadBuffer {
     return buffer.lengthInBytes - pos;
   }
 
-  void finish() {
+  void finish([String? message]) {
     if (pos != buffer.lengthInBytes) {
-      throw BufferError('unexpected trailing data in buffer');
+      throw BufferError(message ?? 'unexpected trailing data in buffer');
     }
   }
 
@@ -236,6 +236,10 @@ class ReadBuffer {
     final num = buffer.getFloat64(pos);
     pos += 8;
     return num;
+  }
+
+  bool readBool() {
+    return readUint8() != 0;
   }
 
   Uint8List readBytes(int size) {

@@ -22,7 +22,7 @@ import '../primitives/buffer.dart';
 import 'codecs.dart';
 
 class ConfigMemoryCodec extends ScalarCodec {
-  ConfigMemoryCodec(super.tid);
+  ConfigMemoryCodec(super.tid, super.typeName);
 
   @override
   // ignore: overridden_fields

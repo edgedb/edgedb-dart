@@ -34,4 +34,11 @@ class ProtocolVersion {
     }
     return hi > other.hi;
   }
+
+  bool operator >=(ProtocolVersion other) {
+    if (hi == other.hi) {
+      return lo >= other.lo;
+    }
+    return hi > other.hi;
+  }
 }

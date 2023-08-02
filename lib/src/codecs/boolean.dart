@@ -21,7 +21,7 @@ import '../primitives/buffer.dart';
 import 'codecs.dart';
 
 class BoolCodec extends ScalarCodec {
-  BoolCodec(super.tid);
+  BoolCodec(super.tid, super.typeName);
 
   @override
   // ignore: overridden_fields

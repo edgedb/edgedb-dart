@@ -37,8 +37,9 @@ enum RangeFlags {
 
 class RangeCodec<T> extends Codec {
   final Codec subCodec;
+  final String? typeName;
 
-  RangeCodec(super.tid, this.subCodec);
+  RangeCodec(super.tid, this.typeName, this.subCodec);
 
   @override
   void encode(WriteBuffer buf, dynamic object) {

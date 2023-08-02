@@ -26,8 +26,9 @@ import 'codecs.dart';
 class ArrayCodec<T> extends Codec {
   final Codec subCodec;
   final int length;
+  final String? typeName;
 
-  ArrayCodec(super.tid, this.subCodec, this.length);
+  ArrayCodec(super.tid, this.typeName, this.subCodec, this.length);
 
   @override
   void encode(WriteBuffer buf, dynamic object) {

@@ -37,8 +37,10 @@ class NamedTupleField {
 class NamedTupleCodec extends Codec {
   final List<NamedTupleField> fields;
   final ReturnTypeConstructor? returnType;
+  final String? typeName;
 
-  NamedTupleCodec(super.tid, List<Codec> subCodecs, List<String> names,
+  NamedTupleCodec(
+      super.tid, this.typeName, List<Codec> subCodecs, List<String> names,
       {this.returnType})
       : fields = List.generate(
             subCodecs.length, (i) => NamedTupleField(names[i], subCodecs[i]));
