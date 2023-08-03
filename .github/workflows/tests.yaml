@@ -43,7 +43,7 @@ jobs:
         run: dart pub get
 
       - name: Lint
-        run: dart analyze
+        run: dart analyze && dart run tool/gen_docs.dart --lintMode
 
       - name: Install EdgeDB
         uses: edgedb/setup-edgedb@v1
