@@ -523,6 +523,8 @@ Future<ResolvedConnectConfig> parseConnectConfig(ConnectConfig config) async {
     user: SourcedValue(config.user, "'user' option"),
     password: SourcedValue(config.password, "'password' option"),
     secretKey: SourcedValue(config.secretKey, "'secretKey' option"),
+    cloudProfile: SourcedValue(getEnvVar('EDGEDB_CLOUD_PROFILE'),
+        "'EDGEDB_CLOUD_PROFILE' environment variable"),
     tlsCA: SourcedValue(config.tlsCA, "'tlsCA' option"),
     tlsCAFile: SourcedValue(config.tlsCAFile, "'tlsCAFile' option"),
     tlsSecurity: SourcedValue(config.tlsSecurity, "'tlsSecurity' option"),
@@ -568,8 +570,6 @@ Future<ResolvedConnectConfig> parseConnectConfig(ConnectConfig config) async {
           "'EDGEDB_PASSWORD' environment variable"),
       secretKey: SourcedValue(getEnvVar('EDGEDB_SECRET_KEY'),
           "'EDGEDB_SECRET_KEY' environment variable"),
-      cloudProfile: SourcedValue(getEnvVar('EDGEDB_CLOUD_PROFILE'),
-          "'EDGEDB_CLOUD_PROFILE' environment variable"),
       tlsCA: SourcedValue(
           getEnvVar('EDGEDB_TLS_CA'), "'EDGEDB_TLS_CA' environment variable"),
       tlsCAFile: SourcedValue(getEnvVar('EDGEDB_TLS_CA_FILE'),
