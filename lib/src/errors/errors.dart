@@ -575,6 +575,33 @@ class BackendUnavailableError extends AvailabilityError {
   final tags = {EdgeDBErrorTag.shouldRetry};
 }
 
+class ServerOfflineError extends AvailabilityError {
+  ServerOfflineError(super.message, [super.source]);
+
+  @override
+  final code = 0x08000002;
+
+  @override
+  final tags = {EdgeDBErrorTag.shouldReconnect, EdgeDBErrorTag.shouldRetry};
+}
+
+class UnknownTenantError extends AvailabilityError {
+  UnknownTenantError(super.message, [super.source]);
+
+  @override
+  final code = 0x08000003;
+
+  @override
+  final tags = {EdgeDBErrorTag.shouldReconnect, EdgeDBErrorTag.shouldRetry};
+}
+
+class ServerBlockedError extends AvailabilityError {
+  ServerBlockedError(super.message, [super.source]);
+
+  @override
+  final code = 0x08000004;
+}
+
 class BackendError extends EdgeDBError {
   BackendError(super.message, [super.source]);
 
