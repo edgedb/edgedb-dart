@@ -33,8 +33,9 @@ abstract class EdgeDBTuple {
 class TupleCodec extends Codec {
   final List<Codec> subCodecs;
   final TupleReturnTypeConstructor? returnType;
+  final String? typeName;
 
-  TupleCodec(super.tid, this.subCodecs, {this.returnType});
+  TupleCodec(super.tid, this.typeName, this.subCodecs, {this.returnType});
 
   @override
   void encode(WriteBuffer buf, dynamic object) {

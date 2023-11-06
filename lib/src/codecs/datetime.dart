@@ -25,7 +25,7 @@ const timeshift = 946684800000000;
 final epochDate = DateTime.utc(2000, 1, 1);
 
 class DateTimeCodec extends ScalarCodec {
-  DateTimeCodec(super.tid);
+  DateTimeCodec(super.tid, super.typeName);
 
   @override
   // ignore: overridden_fields
@@ -49,7 +49,7 @@ class DateTimeCodec extends ScalarCodec {
 }
 
 class LocalDateTimeCodec extends ScalarCodec {
-  LocalDateTimeCodec(super.tid);
+  LocalDateTimeCodec(super.tid, super.typeName);
 
   @override
   // ignore: overridden_fields
@@ -78,7 +78,7 @@ class LocalDateTimeCodec extends ScalarCodec {
 }
 
 class LocalDateCodec extends ScalarCodec {
-  LocalDateCodec(super.tid);
+  LocalDateCodec(super.tid, super.typeName);
 
   @override
   // ignore: overridden_fields
@@ -107,7 +107,7 @@ class LocalDateCodec extends ScalarCodec {
 }
 
 class LocalTimeCodec extends ScalarCodec {
-  LocalTimeCodec(super.tid);
+  LocalTimeCodec(super.tid, super.typeName);
 
   @override
   // ignore: overridden_fields
@@ -134,7 +134,7 @@ class LocalTimeCodec extends ScalarCodec {
 }
 
 class DurationCodec extends ScalarCodec {
-  DurationCodec(super.tid);
+  DurationCodec(super.tid, super.typeName);
 
   @override
   // ignore: overridden_fields
@@ -165,7 +165,7 @@ class DurationCodec extends ScalarCodec {
 }
 
 class RelativeDurationCodec extends ScalarCodec {
-  RelativeDurationCodec(super.tid);
+  RelativeDurationCodec(super.tid, super.typeName);
 
   @override
   // ignore: overridden_fields
@@ -198,7 +198,7 @@ class RelativeDurationCodec extends ScalarCodec {
 }
 
 class DateDurationCodec extends ScalarCodec {
-  DateDurationCodec(super.tid);
+  DateDurationCodec(super.tid, super.typeName);
 
   @override
   // ignore: overridden_fields

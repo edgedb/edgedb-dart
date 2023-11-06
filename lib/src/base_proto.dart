@@ -17,7 +17,7 @@ import 'primitives/transport.dart';
 import 'primitives/types.dart';
 import 'utils/indent.dart';
 
-const protoVer = ProtocolVersion(1, 0);
+const protoVer = ProtocolVersion(2, 0);
 const minProtoVer = ProtocolVersion(1, 0);
 
 enum Capabilities {

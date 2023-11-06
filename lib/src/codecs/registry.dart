@@ -21,6 +21,10 @@ const ctypeArray = 6;
 const ctypeEnum = 7;
 const ctypeInputShape = 8;
 const ctypeRange = 9;
+const ctypeObject = 10;
+const ctypeCompound = 11;
+
+const protoV2 = ProtocolVersion(2, 0);
 
 class CodecsRegistry {
   final codecsBuildCache = LRU<String, Codec>(capacity: codecsBuildCacheSize);
@@ -57,7 +61,14 @@ class CodecsRegistry {
     Codec? codec;
 
     while (frb.length > 0) {
-      codec = _buildCodec(frb, codecsList, protocolVersion);
+      if (protocolVersion >= protoV2) {
+        final descLen = frb.readInt32();
+        final descBuf = frb.slice(descLen);
+        codec = _buildCodec(descBuf, codecsList, protocolVersion, true);
+        descBuf.finish("unexpected trailing data in type descriptor buffer");
+      } else {
+        codec = _buildCodec(frb, codecsList, protocolVersion, false);
+      }
       if (codec == null) {
         // An annotation; ignore.
         continue;
@@ -73,11 +84,8 @@ class CodecsRegistry {
     return codecsList.last;
   }
 
-  Codec? _buildCodec(
-    ReadBuffer frb,
-    List<Codec> cl,
-    ProtocolVersion protocolVersion,
-  ) {
+  Codec? _buildCodec(ReadBuffer frb, List<Codec> cl,
+      ProtocolVersion protocolVersion, bool isProtoV2) {
     final t = frb.readUint8();
     final tid = frb.readUUID();
 
@@ -86,6 +94,10 @@ class CodecsRegistry {
     if (res != null) {
       // We have a codec for this "tid"; advance the buffer
       // so that we can process the next codec.
+      if (isProtoV2) {
+        frb.discard(frb.length);
+        return res;
+      }
 
       switch (t) {
         case ctypeSet:
@@ -196,16 +208,19 @@ class CodecsRegistry {
             throw InternalClientError(
                 'no Dart codec for the type with ID $tid');
           }
-          if (res is! ScalarCodec) {
-            throw ProtocolError(
-                'could not build scalar codec: base scalar has a non-scalar codec');
-          }
           break;
         }
 
       case ctypeShape:
       case ctypeInputShape:
         {
+          if (t == ctypeShape && isProtoV2) {
+            // ignore: unused_local_variable
+            final isEphemeralFreeShape = frb.readBool();
+            // ignore: unused_local_variable
+            final objTypePos = frb.readUint16();
+          }
+
           final els = frb.readUint16();
           final codecs = <Codec>[];
           final names = <String>[];
@@ -231,6 +246,12 @@ class CodecsRegistry {
             codecs.add(subCodec);
             names.add(isLinkprop ? '@$name' : name);
             cards.add(card);
+
+            if (t == ctypeShape && isProtoV2) {
+              final sourceTypePos = frb.readUint16();
+              // ignore: unused_local_variable
+              final sourceType = cl[sourceTypePos];
+            }
           }
 
           res = t == ctypeInputShape
@@ -255,25 +276,84 @@ class CodecsRegistry {
 
       case ctypeScalar:
         {
-          final pos = frb.readUint16();
+          if (isProtoV2) {
+            final typeName = frb.readString();
+            // ignore: unused_local_variable
+            final isSchemaDefined = frb.readBool();
 
-          try {
-            res = cl[pos];
-          } catch (e) {
-            throw ProtocolError(
-                'could not build scalar codec: missing a codec for base scalar');
-          }
+            final ancestorCount = frb.readUint16();
+            final ancestors = <Codec>[];
+            for (var i = 0; i < ancestorCount; i++) {
+              final ancestorPos = frb.readUint16();
+              Codec? ancestorCodec;
+              try {
+                ancestorCodec = cl[ancestorPos];
+              } catch (e) {
+                throw ProtocolError(
+                    'could not build scalar codec: missing a codec for base scalar');
+              }
+              if (ancestorCodec is! ScalarCodec) {
+                throw ProtocolError(
+                    'a scalar codec expected for base scalar type, '
+                    'got ${ancestorCodec.runtimeType}');
+              }
+              ancestors.add(ancestorCodec);
+            }
 
-          if (res is! ScalarCodec) {
-            throw ProtocolError(
-                'could not build scalar codec: base scalar has a non-scalar codec');
+            if (ancestorCount == 0) {
+              res = scalarCodecs[tid];
+              if (res == null) {
+                if (knownTypes.containsKey(tid)) {
+                  throw InternalClientError(
+                      'no Dart codec for ${knownTypes[tid]}');
+                }
+
+                throw InternalClientError(
+                    'no Dart codec for the type with ID $tid');
+              }
+            } else {
+              final baseCodec = ancestors.last;
+              if (baseCodec is! ScalarCodec) {
+                throw ProtocolError(
+                    'a scalar codec expected for base scalar type, '
+                    'got ${baseCodec.runtimeType}');
+              }
+              res = baseCodec.derive(tid, typeName);
+            }
+          } else {
+            final pos = frb.readUint16();
+
+            try {
+              res = cl[pos];
+            } catch (e) {
+              throw ProtocolError(
+                  'could not build scalar codec: missing a codec for base scalar');
+            }
+
+            if (res is! ScalarCodec) {
+              throw ProtocolError(
+                  'could not build scalar codec: base scalar has a non-scalar codec');
+            }
+            res = res.derive(tid, null);
           }
-          res = res.derive(tid);
           break;
         }
 
       case ctypeArray:
         {
+          String? typeName;
+          if (isProtoV2) {
+            typeName = frb.readString();
+            // ignore: unused_local_variable
+            final isSchemaDefined = frb.readBool();
+            final ancestorCount = frb.readUint16();
+            for (var i = 0; i < ancestorCount; i++) {
+              final ancestorPos = frb.readUint16();
+              // ignore: unused_local_variable
+              final ancestorCodec = cl[ancestorPos];
+            }
+          }
+
           final pos = frb.readUint16();
           final els = frb.readUint16();
           if (els != 1) {
@@ -288,12 +368,25 @@ class CodecsRegistry {
             throw ProtocolError(
                 'could not build array codec: missing subcodec');
           }
-          res = ArrayCodec(tid, subCodec, dimLen);
+          res = ArrayCodec(tid, typeName, subCodec, dimLen);
           break;
         }
 
       case ctypeTuple:
         {
+          String? typeName;
+          if (isProtoV2) {
+            typeName = frb.readString();
+            // ignore: unused_local_variable
+            final isSchemaDefined = frb.readBool();
+            final ancestorCount = frb.readUint16();
+            for (var i = 0; i < ancestorCount; i++) {
+              final ancestorPos = frb.readUint16();
+              // ignore: unused_local_variable
+              final ancestorCodec = cl[ancestorPos];
+            }
+          }
+
           final els = frb.readUint16();
           if (els == 0) {
             res = emptyTupleCodec;
@@ -310,13 +403,26 @@ class CodecsRegistry {
               }
               codecs.add(subCodec);
             }
-            res = TupleCodec(tid, codecs);
+            res = TupleCodec(tid, typeName, codecs);
           }
           break;
         }
 
       case ctypeNamedtuple:
         {
+          String? typeName;
+          if (isProtoV2) {
+            typeName = frb.readString();
+            // ignore: unused_local_variable
+            final isSchemaDefined = frb.readBool();
+            final ancestorCount = frb.readUint16();
+            for (var i = 0; i < ancestorCount; i++) {
+              final ancestorPos = frb.readUint16();
+              // ignore: unused_local_variable
+              final ancestorCodec = cl[ancestorPos];
+            }
+          }
+
           final els = frb.readUint16();
           final codecs = <Codec>[];
           final names = <String>[];
@@ -333,22 +439,48 @@ class CodecsRegistry {
             }
             codecs.add(subCodec);
           }
-          res = NamedTupleCodec(tid, codecs, names);
+          res = NamedTupleCodec(tid, typeName, codecs, names);
           break;
         }
 
       case ctypeEnum:
         {
+          String? typeName;
+          if (isProtoV2) {
+            typeName = frb.readString();
+            // ignore: unused_local_variable
+            final isSchemaDefined = frb.readBool();
+            final ancestorCount = frb.readUint16();
+            for (var i = 0; i < ancestorCount; i++) {
+              final ancestorPos = frb.readUint16();
+              // ignore: unused_local_variable
+              final ancestorCodec = cl[ancestorPos];
+            }
+          }
+
           final els = frb.readUint16();
           for (var i = 0; i < els; i++) {
             frb.discard(frb.readUint32());
           }
-          res = EnumCodec(tid);
+          res = EnumCodec(tid, typeName);
           break;
         }
 
       case ctypeRange:
         {
+          String? typeName;
+          if (isProtoV2) {
+            typeName = frb.readString();
+            // ignore: unused_local_variable
+            final isSchemaDefined = frb.readBool();
+            final ancestorCount = frb.readUint16();
+            for (var i = 0; i < ancestorCount; i++) {
+              final ancestorPos = frb.readUint16();
+              // ignore: unused_local_variable
+              final ancestorCodec = cl[ancestorPos];
+            }
+          }
+
           final pos = frb.readUint16();
           Codec subCodec;
           try {
@@ -357,7 +489,30 @@ class CodecsRegistry {
             throw ProtocolError(
                 'could not build range codec: missing subcodec');
           }
-          res = RangeCodec(tid, subCodec);
+          res = RangeCodec(tid, typeName, subCodec);
+          break;
+        }
+
+      case ctypeObject:
+        {
+          // Ignore
+          frb.discard(frb.length);
+          res = nullCodec;
+          break;
+        }
+
+      case ctypeCompound:
+        {
+          // Ignore
+          frb.discard(frb.length);
+          res = nullCodec;
+          break;
+        }
+
+      default:
+        {
+          throw ProtocolError(
+              'no codec implementation for EdgeDB data class $t');
         }
     }
 

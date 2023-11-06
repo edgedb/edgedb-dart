@@ -25,7 +25,7 @@ import 'codecs.dart';
 const pgvectorMaxDim = (1 << 16) - 1;
 
 class PgVectorCodec extends ScalarCodec {
-  PgVectorCodec(super.tid);
+  PgVectorCodec(super.tid, super.typeName);
 
   @override
   // ignore: overridden_fields

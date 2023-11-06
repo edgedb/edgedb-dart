@@ -56,14 +56,16 @@ abstract class Codec {
 }
 
 abstract class ScalarCodec extends Codec {
-  ScalarCodec(super.tid);
+  final String? typeName;
+
+  ScalarCodec(super.tid, this.typeName);
 
   final String returnType = 'dynamic';
   final String? returnTypeImport = null;
   final String? argType = null;
 
-  derive(String tid) {
-    return _scalarCodecConstructors[this.tid]!(this.tid);
+  derive(String tid, String? typeName) {
+    return _scalarCodecConstructors[this.tid]!(tid, typeName);
   }
 
   @override
@@ -115,7 +117,7 @@ final _scalarCodecConstructors = {
   'cal::date_duration': DateDurationCodec.new,
   'cfg::memory': ConfigMemoryCodec.new,
   'ext::pgvector::vector': PgVectorCodec.new,
-}.map<String, ScalarCodec Function(String)>((typename, type) {
+}.map<String, ScalarCodec Function(String, String?)>((typename, type) {
   final id = knownTypeNames[typename];
   if (id == null) {
     throw InternalClientError("unknown codec type name");
@@ -125,5 +127,5 @@ final _scalarCodecConstructors = {
 
 final scalarCodecs = {
   for (var codec in _scalarCodecConstructors.entries)
-    codec.key: codec.value(codec.key)
+    codec.key: codec.value(codec.key, knownTypes[codec.key])
 };

@@ -24,7 +24,7 @@ import '../primitives/buffer.dart';
 import 'codecs.dart';
 
 class JSONCodec extends ScalarCodec {
-  JSONCodec(super.tid);
+  JSONCodec(super.tid, super.typeName);
 
   @override
   void encode(WriteBuffer buf, dynamic object) {

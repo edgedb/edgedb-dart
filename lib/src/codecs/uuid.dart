@@ -21,7 +21,7 @@ import '../primitives/buffer.dart';
 import 'codecs.dart';
 
 class UUIDCodec extends ScalarCodec {
-  UUIDCodec(super.tid);
+  UUIDCodec(super.tid, super.typeName);
 
   @override
   // ignore: overridden_fields

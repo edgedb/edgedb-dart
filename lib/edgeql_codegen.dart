@@ -352,6 +352,10 @@ _WalkCodecReturn _walkCodec(Codec codec, LibraryBuilder file,
                 'package:edgedb/src/codecs/codecs.dart')
             .newInstance([
           literalString(codec.tid),
+          if (codec is NamedTupleCodec)
+            codec.typeName != null
+                ? literalString(codec.typeName!)
+                : literalNull,
           literalList(codecs),
           literalList(names),
           if (codec is ObjectCodec) literalList(cards),
@@ -386,6 +390,14 @@ _WalkCodecReturn _walkCodec(Codec codec, LibraryBuilder file,
                 'package:edgedb/src/codecs/codecs.dart')
             .newInstance([
           literalString(codec.tid),
+          if (codec is ArrayCodec)
+            codec.typeName != null
+                ? literalString(codec.typeName!)
+                : literalNull,
+          if (codec is RangeCodec)
+            codec.typeName != null
+                ? literalString(codec.typeName!)
+                : literalNull,
           child.codecExpr,
           if (codec is ArrayCodec) literalNum(codec.length)
         ], {}, [
@@ -443,6 +455,7 @@ _WalkCodecReturn _walkCodec(Codec codec, LibraryBuilder file,
         Reference('TupleCodec', 'package:edgedb/src/codecs/codecs.dart')
             .newInstance([
           literalString(codec.tid),
+          codec.typeName != null ? literalString(codec.typeName!) : literalNull,
           literalList(codecs),
         ], {
           if (!isArgsCodec)
