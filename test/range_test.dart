@@ -4,6 +4,128 @@ import 'package:edgedb/edgedb.dart';
 import 'package:test/test.dart';
 
 void main() {
+  group('basic tests:', () {
+    test('empty range', () {
+      final range = Range.empty();
+      expect(range.lower, null);
+      expect(range.upper, null);
+      expect(range.incLower, false);
+      expect(range.incUpper, false);
+      expect(range.isEmpty, true);
+    });
+
+    test('range 1', () {
+      final range = Range(1, 2);
+      expect(range.toString(), "[1,2)");
+
+      expect(range.lower, 1);
+      expect(range.upper, 2);
+      expect(range.incLower, true);
+      expect(range.incUpper, false);
+      expect(range.isEmpty, false);
+    });
+
+    test('range 2', () {
+      var range = Range(1, null);
+      expect(range.lower, 1);
+      expect(range.upper, null);
+      expect(range.incLower, true);
+      expect(range.incUpper, false);
+      expect(range.isEmpty, false);
+
+      range = Range(null, 1);
+      expect(range.lower, null);
+      expect(range.upper, 1);
+      expect(range.incLower, false);
+      expect(range.incUpper, false);
+      expect(range.isEmpty, false);
+
+      range = Range(null, null);
+      expect(range.lower, null);
+      expect(range.upper, null);
+      expect(range.incLower, false);
+      expect(range.incUpper, false);
+      expect(range.isEmpty, false);
+    });
+
+    test('range 3', () {
+      expect(Range(null, 2, incUpper: true).hashCode,
+          Range(null, 2, incUpper: true).hashCode);
+      expect(Range(1, 2).hashCode, Range(1, 2).hashCode);
+    });
+  });
+
+  group('multirange tests:', () {
+    test('empty multirange', () {
+      final multirange = MultiRange([]);
+      expect(multirange.length, 0);
+      expect(multirange, MultiRange([]));
+    });
+
+    test('multirange 1', () {
+      final multirange = MultiRange<int>([
+        Range(1, 2),
+        Range(4, null),
+      ]);
+      expect(multirange.toString(), "[[1,2), [4,)]");
+
+      expect(
+          multirange,
+          MultiRange<int>([
+            Range(1, 2),
+            Range(4, null),
+          ]));
+    });
+
+    test('multirange 2', () {
+      final ranges = [
+        Range(null, 0),
+        Range(1, 2),
+        Range(4, null),
+      ];
+      final multirange = MultiRange<int>([
+        Range(null, 0),
+        Range(1, 2),
+        Range(4, null),
+      ]);
+
+      var i = 0;
+      for (var element in multirange) {
+        expect(element, ranges[i++]);
+      }
+    });
+
+    test('multirange 3', () {
+      expect(
+          MultiRange<int>([
+            Range(1, 2),
+            Range(4, null),
+          ]).hashCode,
+          MultiRange<int>([
+            Range(1, 2),
+            Range(4, null),
+          ]).hashCode);
+      expect(MultiRange<int>([Range(null, 2, incUpper: true)]).hashCode,
+          MultiRange<int>([Range(null, 2, incUpper: true)]).hashCode);
+    });
+
+    test('multirange 4', () {
+      expect(
+        MultiRange<int>([
+          Range(null, 2, incUpper: true),
+          Range(5, 9),
+          Range(5, 9),
+          Range(5, 9),
+          Range(null, 2, incUpper: true),
+        ]),
+        MultiRange<int>([
+          Range(5, 9),
+          Range(null, 2, incUpper: true),
+        ]),
+      );
+    });
+  });
+
   group('constructing ranges:', () {
     test('invalid', () {
       expect(() => Range('5', '10'), throwsA(isA<ArgumentError>()));

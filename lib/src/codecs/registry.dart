@@ -23,6 +23,7 @@ const ctypeInputShape = 8;
 const ctypeRange = 9;
 const ctypeObject = 10;
 const ctypeCompound = 11;
+const ctypeMultiRange = 12;
 
 const protoV2 = ProtocolVersion(2, 0);
 
@@ -125,6 +126,7 @@ class CodecsRegistry {
           }
 
         case ctypeRange:
+        case ctypeMultiRange:
         case ctypeScalar:
           {
             frb.discard(2);
@@ -467,6 +469,7 @@ class CodecsRegistry {
         }
 
       case ctypeRange:
+      case ctypeMultiRange:
         {
           String? typeName;
           if (isProtoV2) {
@@ -487,9 +490,12 @@ class CodecsRegistry {
             subCodec = cl[pos];
           } catch (e) {
             throw ProtocolError(
-                'could not build range codec: missing subcodec');
+                'could not build ${t == ctypeMultiRange ? 'multi' : ''}range'
+                ' codec: missing subcodec');
           }
-          res = RangeCodec(tid, typeName, subCodec);
+          res = t == ctypeMultiRange
+              ? MultiRangeCodec(tid, typeName, subCodec)
+              : RangeCodec(tid, typeName, subCodec);
           break;
         }
 

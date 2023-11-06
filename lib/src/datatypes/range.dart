@@ -16,6 +16,8 @@
  * limitations under the License.
  */
 
+import 'dart:collection';
+
 _add(dynamic a, dynamic b) {
   if (a is DateTime) {
     return a.add(b);
@@ -485,5 +487,67 @@ class Range<T> extends Comparable<Range<T>> {
       return false;
     }
     return true;
+  }
+}
+
+class MultiRange<T> with SetBase<Range<T>> implements Set<Range<T>> {
+  final SplayTreeSet<Range<T>> _ranges;
+
+  MultiRange(Iterable<Range<T>> ranges) : _ranges = SplayTreeSet.from(ranges);
+
+  @override
+  int get length {
+    return _ranges.length;
+  }
+
+  @override
+  bool add(Range<T> value) {
+    return _ranges.add(value);
+  }
+
+  @override
+  bool contains(Object? element) {
+    return _ranges.contains(element);
+  }
+
+  @override
+  Iterator<Range<T>> get iterator => _ranges.iterator;
+
+  @override
+  Range<T>? lookup(Object? element) {
+    return _ranges.lookup(element);
+  }
+
+  @override
+  bool remove(Object? value) {
+    return _ranges.remove(value);
+  }
+
+  @override
+  Set<Range<T>> toSet() {
+    return _ranges.toSet();
+  }
+
+  /// Returns whether two multiranges are equal.
+  @override
+  bool operator ==(Object other) {
+    if (other is! MultiRange<T>) {
+      return false;
+    }
+
+    return _ranges == other._ranges;
+  }
+
+  /// The hash code for this object.
+  @override
+  int get hashCode => Object.hashAll(_ranges);
+
+  @override
+  String toString() {
+    return '[${_ranges.join(', ')}]';
+  }
+
+  toJSON() {
+    return _ranges.map((range) => range.toJSON());
   }
 }

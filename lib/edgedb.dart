@@ -64,6 +64,7 @@
 /// | Tuples (`tuple<x, y, ...>`)                 | [List<dynamic>]               |
 /// | Named tuples (`tuple<foo: x, bar: y, ...>`) | [Map<String, dynamic>]        |
 /// | Ranges                                      | [Range<dynamic>]              |
+/// | Multiranges                                 | [MultiRange<dynamic>]         |
 /// | Enums                                       | [String]                      |
 /// | `str`                                       | [String]                      |
 /// | `bool`                                      | [bool]                        |
@@ -120,5 +121,5 @@ export 'src/connect_config.dart' show ConnectConfig, TLSSecurity;
 export 'src/errors/errors.dart';
 export 'src/datatypes/datetime.dart'
     show LocalDateTime, LocalDate, LocalTime, RelativeDuration, DateDuration;
-export 'src/datatypes/range.dart' show Range;
+export 'src/datatypes/range.dart' show Range, MultiRange;
 export 'src/datatypes/memory.dart' show ConfigMemory;

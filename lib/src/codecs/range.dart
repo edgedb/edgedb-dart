@@ -41,8 +41,7 @@ class RangeCodec<T> extends Codec {
 
   RangeCodec(super.tid, this.typeName, this.subCodec);
 
-  @override
-  void encode(WriteBuffer buf, dynamic object) {
+  static void encodeRange(Codec subCodec, WriteBuffer buf, dynamic object) {
     if (object is! Range) {
       throw InvalidArgumentError(
           "a 'Range' type was expected, got '${object.runtimeType}'");
@@ -68,8 +67,7 @@ class RangeCodec<T> extends Codec {
       ..writeBuffer(elemBuf as Uint8List);
   }
 
-  @override
-  dynamic decode(ReadBuffer buf) {
+  static dynamic decodeRange<T>(Codec subCodec, ReadBuffer buf) {
     final flags = buf.readUint8();
 
     if (flags & RangeFlags.empty.value != 0) {
@@ -97,6 +95,16 @@ class RangeCodec<T> extends Codec {
   }
 
   @override
+  void encode(WriteBuffer buf, dynamic object) {
+    encodeRange(subCodec, buf, object);
+  }
+
+  @override
+  dynamic decode(ReadBuffer buf) {
+    return decodeRange<T>(subCodec, buf);
+  }
+
+  @override
   String toString() {
     return 'RangeCodec ($tid) {\n  ${indent(subCodec.toString())}\n}';
   }
@@ -104,5 +112,78 @@ class RangeCodec<T> extends Codec {
   @override
   bool compare(Codec codec) {
     return codec is RangeCodec && subCodec.compare(codec.subCodec);
+  }
+}
+
+class MultiRangeCodec<T> extends Codec {
+  final Codec subCodec;
+  final String? typeName;
+
+  MultiRangeCodec(super.tid, this.typeName, this.subCodec);
+
+  @override
+  void encode(WriteBuffer buf, dynamic object) {
+    if (object is! MultiRange) {
+      throw InvalidArgumentError(
+          "a 'MultiRange' type was expected, got '${object.runtimeType}'");
+    }
+
+    final objLen = object.length;
+
+    if (objLen > 0x7fffffff) {
+      // objLen > MAXINT32
+      throw InvalidArgumentError("too many elements in multirange");
+    }
+
+    final elemData = WriteBuffer();
+
+    for (var item in object) {
+      try {
+        RangeCodec.encodeRange(subCodec, elemData, item);
+      } catch (e) {
+        throw InvalidArgumentError('invalid multirange element: $e');
+      }
+    }
+
+    final elemBuf = elemData.unwrap();
+    if (elemBuf.length > 0x7fffffff - 4) {
+      throw InvalidArgumentError(
+          'size of encoded multirange extends allowed ${0x7fffffff - 4} bytes');
+    }
+
+    buf
+      ..writeInt32(4 + elemBuf.length)
+      ..writeInt32(objLen)
+      ..writeBuffer(elemBuf as Uint8List);
+  }
+
+  @override
+  dynamic decode(ReadBuffer buf) {
+    final elemCount = buf.readInt32();
+
+    final result = <Range<T>>[];
+
+    for (var i = 0; i < elemCount; i++) {
+      final elemLen = buf.readInt32();
+      if (elemLen == -1) {
+        throw ProtocolError("unexpected NULL value in multirange");
+      } else {
+        final elemBuf = buf.slice(elemLen);
+        result.add(RangeCodec.decodeRange(subCodec, elemBuf));
+        elemBuf.finish();
+      }
+    }
+
+    return MultiRange(result);
+  }
+
+  @override
+  String toString() {
+    return 'MultiRangeCodec ($tid) {\n  ${indent(subCodec.toString())}\n}';
+  }
+
+  @override
+  bool compare(Codec codec) {
+    return codec is MultiRangeCodec && subCodec.compare(codec.subCodec);
   }
 }
