@@ -1,3 +1,12 @@
+# 0.4.0
+
+- Add support for multiranges in EdgeDB 4.0
+- Update to handle EdgeDB protocol v2
+- Add support for project default database config
+- Fix handling of `EDGEDB_CLOUD_PROFILE` env var when instance name is
+  specified as a config option to `createClient`
+- Update error classes
+
 # 0.3.0
 
 - Fix cloud instance resolution by normalizing cloud instance names to
