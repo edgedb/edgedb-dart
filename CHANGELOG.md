@@ -1,6 +1,22 @@
-# 0.1.0
+# 0.3.0
 
-- First release of edgedb-dart 🎉
+- Fix cloud instance resolution by normalizing cloud instance names to
+  lowercase when computing cloud host
+- Add support for pgvector extension (<https://www.edgedb.com/docs/stdlib/pgvector>)
+- Codegen bug fixes:
+  - Fix query escaping
+  - Fix bug when query returns scalar type that is not a builtin dart type
+
+# 0.2.2
+
+- Update EdgeDB error classes
+- Add `toJson` method to codegen result classes
+- Fix bug in connection config explain when password is empty string
+
+# 0.2.1
+
+- Update to handle new instance name rules
+- Fix sending of secret key parameter in connection handshake
 
 # 0.2.0
 
@@ -13,22 +29,6 @@
     the one that was used to run codegen)
   - Fix handling of optional and complex query parameters
 
-# 0.2.1
+# 0.1.0
 
-- Update to handle new instance name rules
-- Fix sending of secret key parameter in connection handshake
-
-# 0.2.2
-
-- Update EdgeDB error classes
-- Add `toJson` method to codegen result classes
-- Fix bug in connection config explain when password is empty string
-
-# 0.3.0
-
-- Fix cloud instance resolution by normalizing cloud instance names to
-  lowercase when computing cloud host
-- Add support for pgvector extension (<https://www.edgedb.com/docs/stdlib/pgvector>)
-- Codegen bug fixes:
-  - Fix query escaping
-  - Fix bug when query returns scalar type that is not a builtin dart type
+- First release of edgedb-dart 🎉
