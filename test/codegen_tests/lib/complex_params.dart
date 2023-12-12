@@ -13,7 +13,7 @@ void main() async {
         namedTup: Param_namedTup(a: 'test', b: 456),
         arrayTup: [Param_arrayTup('test', true)],
         optTup: Param_optTup('test', 123),
-        enum: sys_VersionStage.dev);
+        verStage: sys_VersionStage.dev);
 
     // skip optional params
     await client.complexParams(
@@ -21,7 +21,7 @@ void main() async {
         tup: Param_tup('test', 123),
         namedTup: Param_namedTup(a: 'test', b: 456),
         arrayTup: [Param_arrayTup('test', true)],
-        enum: sys_VersionStage.dev);
+        verStage: sys_VersionStage.dev);
   } finally {
     await client.close();
   }
