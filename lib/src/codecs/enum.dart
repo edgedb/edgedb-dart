@@ -16,12 +16,32 @@
  * limitations under the License.
  */
 
+import "../primitives/buffer.dart";
 import "text.dart";
 
+abstract class EnumType {
+  abstract final String value;
+}
+
 class EnumCodec extends StrCodec {
-  EnumCodec(super.tid, super.typeName);
+  final List<String> values;
+  final Enum Function(String val)? fromString;
+
+  EnumCodec(super.tid, super.typeName, this.values, {this.fromString});
 
   @override
   // ignore: overridden_fields
   final returnType = 'String';
+
+  @override
+  dynamic decode(ReadBuffer buf) {
+    final val = super.decode(buf);
+
+    return fromString != null ? fromString!(val) : val;
+  }
+
+  @override
+  void encode(WriteBuffer buf, object) {
+    super.encode(buf, object is EnumType ? object.value : object);
+  }
 }

@@ -460,11 +460,12 @@ class CodecsRegistry {
             }
           }
 
+          final values = <String>[];
           final els = frb.readUint16();
           for (var i = 0; i < els; i++) {
-            frb.discard(frb.readUint32());
+            values.add(frb.readString());
           }
-          res = EnumCodec(tid, typeName);
+          res = EnumCodec(tid, typeName, values);
           break;
         }
 

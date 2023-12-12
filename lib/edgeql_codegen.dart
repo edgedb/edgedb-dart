@@ -132,9 +132,10 @@ class EdgeqlCodegenBuilder implements Builder {
     final typeName = fileName[0].toUpperCase() + fileName.substring(1);
 
     final file = LibraryBuilder();
+    final emittedTypeNames = <String>{};
 
-    final returnType =
-        _walkCodec(parseResult.outCodec, file, typeName: typeName);
+    final returnType = _walkCodec(parseResult.outCodec, file, emittedTypeNames,
+        typeName: typeName);
 
     file.body.add(declareConst('_query').assign(_queryString(query)).statement);
 
@@ -154,7 +155,7 @@ class EdgeqlCodegenBuilder implements Builder {
 
     Class? argsClass;
     if (inCodec != null) {
-      final walkedCodec = _walkCodec(inCodec, file,
+      final walkedCodec = _walkCodec(inCodec, file, emittedTypeNames,
           typeName: 'Param', isArgsCodec: true, omitOutput: true);
       file.body.add(
           declareFinal('_inCodec').assign(walkedCodec.codecExpr).statement);
@@ -246,6 +247,43 @@ Expression _queryString(String value) {
   return CodeExpression(Code("'''$escaped'''"));
 }
 
+const reservedKeywords = [
+  "assert",
+  "break",
+  "case",
+  "catch",
+  "class",
+  "const",
+  "continue",
+  "default",
+  "do",
+  "else",
+  "enum",
+  "extends",
+  "false",
+  "final",
+  "finally",
+  "for",
+  "if",
+  "in",
+  "is",
+  "new",
+  "null",
+  "rethrow",
+  "return",
+  "super",
+  "switch",
+  "this",
+  "throw",
+  "true",
+  "try",
+  "var",
+  "void",
+  "when",
+  "while",
+  "with"
+];
+
 class _WalkCodecReturn {
   final TypeReference typeRef;
   final Expression codecExpr;
@@ -254,8 +292,70 @@ class _WalkCodecReturn {
   _WalkCodecReturn(this.typeRef, this.codecExpr, [this.classExpr]);
 }
 
-_WalkCodecReturn _walkCodec(Codec codec, LibraryBuilder file,
+_WalkCodecReturn _walkCodec(
+    Codec codec, LibraryBuilder file, Set<String> emittedTypeNames,
     {String? typeName, bool isArgsCodec = false, bool omitOutput = false}) {
+  if (codec is EnumCodec) {
+    final enumName = (codec.typeName ?? typeName)!
+        .replaceFirst(RegExp('^default::'), '')
+        .replaceAll('::', '_');
+    if (!emittedTypeNames.contains(enumName)) {
+      final enumType = EnumBuilder()
+        ..name = enumName
+        ..implements.add(
+            Reference('EnumType', 'package:edgedb/src/codecs/codecs.dart'));
+      for (var name in codec.values) {
+        enumType.values.add((EnumValueBuilder()
+              ..name = reservedKeywords.contains(name) ? '\$$name' : name
+              ..arguments.add(literalString(name)))
+            .build());
+      }
+      enumType.fields.add((Field((builder) => builder
+        ..name = 'value'
+        ..type = Reference('String')
+        ..modifier = FieldModifier.final$)));
+      enumType.constructors.add((ConstructorBuilder()
+            ..constant = true
+            ..requiredParameters.add(Parameter((builder) => builder
+              ..name = 'value'
+              ..toThis = true)))
+          .build());
+      enumType.constructors.add((ConstructorBuilder()
+            ..name = 'fromString'
+            ..factory = true
+            ..requiredParameters.add(Parameter((builder) => builder
+              ..name = 'val'
+              ..type = Reference('String')))
+            ..body = Reference('values')
+                .property('firstWhere')
+                .call([
+                  Method((builder) => builder
+                    ..lambda = true
+                    ..requiredParameters.add(Parameter((b) => b..name = 'el'))
+                    ..body = Reference('el')
+                        .property('value')
+                        .equalTo(Reference('val'))
+                        .code).closure
+                ])
+                .returned
+                .statement)
+          .build());
+
+      file.body.add(enumType.build());
+      emittedTypeNames.add(enumName);
+    }
+
+    return _WalkCodecReturn(
+        TypeReference((ref) => ref..symbol = enumName),
+        Reference('EnumCodec', 'package:edgedb/src/codecs/codecs.dart')
+            .newInstance([
+          literalString(codec.tid),
+          literalNull,
+          literalList(codec.values),
+        ], {
+          'fromString': Reference(enumName).property('fromString')
+        }));
+  }
   if (codec is ScalarCodec) {
     return _WalkCodecReturn(
         TypeReference((ref) => ref
@@ -263,12 +363,9 @@ _WalkCodecReturn _walkCodec(Codec codec, LibraryBuilder file,
           ..url = !(isArgsCodec && codec.argType != null)
               ? codec.returnTypeImport
               : null),
-        codec is EnumCodec
-            ? Reference('EnumCodec', 'package:edgedb/src/codecs/codecs.dart')
-                .newInstance([literalString(codec.tid)])
-            : Reference('scalarCodecs', 'package:edgedb/src/codecs/codecs.dart')
-                .index(literalString(codec.tid))
-                .nullChecked);
+        Reference('scalarCodecs', 'package:edgedb/src/codecs/codecs.dart')
+            .index(literalString(codec.tid))
+            .nullChecked);
   }
   if (codec is ObjectCodec || codec is NamedTupleCodec) {
     final typeClass = ClassBuilder()..name = typeName;
@@ -292,7 +389,7 @@ _WalkCodecReturn _walkCodec(Codec codec, LibraryBuilder file,
 
     void visitField(String name, Codec subcodec, Cardinality cardinality) {
       final validName = name.replaceFirst(RegExp('^@'), '\$');
-      final child = _walkCodec(subcodec, file,
+      final child = _walkCodec(subcodec, file, emittedTypeNames,
           typeName: '${typeName}_$validName', isArgsCodec: isArgsCodec);
       final typeField = FieldBuilder()
         ..name = validName
@@ -373,6 +470,7 @@ _WalkCodecReturn _walkCodec(Codec codec, LibraryBuilder file,
                 ? codec.subCodec
                 : (codec as RangeCodec).subCodec,
         file,
+        emittedTypeNames,
         typeName: typeName,
         isArgsCodec: isArgsCodec);
     return _WalkCodecReturn(
@@ -423,7 +521,7 @@ _WalkCodecReturn _walkCodec(Codec codec, LibraryBuilder file,
     for (var subCodec in codec.subCodecs) {
       final name = '\$$i';
       names.add(Reference(name));
-      final child = _walkCodec(subCodec, file,
+      final child = _walkCodec(subCodec, file, emittedTypeNames,
           typeName: '${typeName}_$i', isArgsCodec: isArgsCodec);
       final typeField = FieldBuilder()
         ..name = name

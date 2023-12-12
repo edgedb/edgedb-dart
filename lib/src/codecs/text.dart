@@ -39,7 +39,7 @@ class StrCodec extends ScalarCodec {
   }
 
   @override
-  String decode(ReadBuffer buf) {
+  dynamic decode(ReadBuffer buf) {
     return utf8.decode(buf.readBytes(buf.length));
   }
 }
