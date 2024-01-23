@@ -265,7 +265,7 @@ _WalkCodecReturn _walkCodec(Codec codec, LibraryBuilder file,
               : null),
         codec is EnumCodec
             ? Reference('EnumCodec', 'package:edgedb/src/codecs/codecs.dart')
-                .newInstance([literalString(codec.tid)])
+                .newInstance([literalString(codec.tid), literalNull])
             : Reference('scalarCodecs', 'package:edgedb/src/codecs/codecs.dart')
                 .index(literalString(codec.tid))
                 .nullChecked);
@@ -301,9 +301,14 @@ _WalkCodecReturn _walkCodec(Codec codec, LibraryBuilder file,
           ..isNullable =
               cardinality == Cardinality.atMostOne); // child.typeRef;
       typeClass.fields.add(typeField.build());
-      typeMapConstructor?.initializers.add(Reference(validName)
-          .assign(Reference('map').index(literalString(name)))
-          .code);
+      var mapping = Reference(validName)
+          .assign(Reference('map').index(literalString(name)));
+      if (cardinality == Cardinality.many) {
+        // This casts List<dynamic> to List<child.typeRef> to avoid runtime error for empty lists
+        mapping =
+            mapping.property('cast').call([], {}, [child.typeRef.types.first]);
+      }
+      typeMapConstructor?.initializers.add(mapping.code);
       typeConstructor?.optionalParameters.add(Parameter((builder) => builder
         ..named = true
         ..required = true
