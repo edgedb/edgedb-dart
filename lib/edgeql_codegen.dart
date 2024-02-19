@@ -265,7 +265,7 @@ _WalkCodecReturn _walkCodec(Codec codec, LibraryBuilder file,
               : null),
         codec is EnumCodec
             ? Reference('EnumCodec', 'package:edgedb/src/codecs/codecs.dart')
-                .newInstance([literalString(codec.tid)])
+                .newInstance([literalString(codec.tid), literalNull])
             : Reference('scalarCodecs', 'package:edgedb/src/codecs/codecs.dart')
                 .index(literalString(codec.tid))
                 .nullChecked);
