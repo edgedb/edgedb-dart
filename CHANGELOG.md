@@ -1,3 +1,9 @@
+# 0.4.1
+
+- Fix bug in set codec type casting, that was causing an error when codegen
+  queries returned an empty set or set of arrays
+- Fix regression in codegen for enum types, introduced in 0.4.0
+
 # 0.4.0
 
 - Add support for multiranges in EdgeDB 4.0
