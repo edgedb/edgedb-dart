@@ -46,7 +46,7 @@ class SetCodec<T> extends Codec {
     buf.discard(8); // ignore flags + reserved
 
     if (ndims == 0) {
-      return [];
+      return <T>[];
     }
     if (ndims != 1) {
       throw ProtocolError('expected 1-dimensional array of records of arrays');
@@ -56,7 +56,7 @@ class SetCodec<T> extends Codec {
 
     buf.discard(4); // ignore the lower bound info
 
-    final result = [];
+    final result = <T>[];
 
     for (var i = 0; i < len; i++) {
       buf.discard(4); // ignore array element size
@@ -89,7 +89,7 @@ class SetCodec<T> extends Codec {
     buf.discard(8); // ignore flags + reserved
 
     if (ndims == 0) {
-      return [];
+      return <T>[];
     }
     if (ndims != 1) {
       throw ProtocolError('invalid set dimensinality: $ndims');
