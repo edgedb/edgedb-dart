@@ -30,7 +30,7 @@ positional parameters as a ``List<dynamic>``.
       title := <str>$0
     }''', ['Iron Man']);
     
-Remember that `parameters </docs/edgeql/parameters#parameter-types-and-json>`__
+Remember that :ref:`parameters <ref_eql_params_types>`
 can only be scalars or arrays of scalars.
 
 Scripts​

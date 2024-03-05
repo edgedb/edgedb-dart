@@ -1,7 +1,7 @@
+.. _edgedb-dart-intro:
+
 Dart client library for EdgeDB
 ==============================
-
-.. _ref_client_dart:
 
 .. toctree::
   :maxdepth: 3
@@ -17,7 +17,7 @@ This is the official `EdgeDB <https://github.com/edgedb/edgedb>`__ client librar
 for Dart.
 
 If you're just getting started with EdgeDB, we recommend going through the
-`EdgeDB Quickstart </docs/quickstart>`__ first. This walks
+:ref:`EdgeDB Quickstart <ref_quickstart>` first. This walks
 you through the process of installing EdgeDB, creating a simple schema, and
 writing some simple queries.
 
@@ -45,7 +45,7 @@ Basic Usage
 -----------
 
 First you'll need to have EdgeDB installed, and to have created an instance for
-your project; we recommend the `Quickstart guide </docs/quickstart>`__
+your project; we recommend the :ref:`Quickstart guide <ref_quickstart>`
 for a overview on how to do this.
 
 Then import the ``edgedb`` library, and create a new client with ``createClient()``.

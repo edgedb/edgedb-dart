@@ -15,6 +15,14 @@ class PageRef {
   const PageRef({required this.page, required this.type, required this.name});
 }
 
+const hrefToRefMapping = {
+  '/docs/quickstart': 'ref_quickstart',
+  '/docs/edgeql/parameters#parameter-types-and-json': 'ref_eql_params_types',
+  '/docs/reference/connection': 'ref_reference_connection',
+  '/docs/stdlib/cfg#client-connections': 'ref_std_cfg_client_connections',
+  '/docs/reference/edgeql/tx_start#parameters': 'ref_eql_statements_start_tx'
+};
+
 const pageRefs = [
   PageRef(page: "api", type: "function", name: "createClient"),
   PageRef(page: "api", type: "class", name: "Client"),
@@ -154,9 +162,9 @@ Future<void> processIndexPage(
   final heading = pageParts[0];
   final content = pageParts[1];
 
-  final indexPage = '''$heading
+  final indexPage = '''.. _edgedb-dart-intro:
 
-.. _ref_client_dart:
+$heading
 
 .. toctree::
   :maxdepth: 3
@@ -402,6 +410,9 @@ String nodeToRst(html.Node node, {bool skipEmptyText = false}) {
           if (RegExp(r'^(www\.)?edgedb\.com').hasMatch(parsedUrl.host)) {
             href = parsedUrl.path +
                 (parsedUrl.hasFragment ? '#${parsedUrl.fragment}' : '');
+            if (hrefToRefMapping.containsKey(href)) {
+              return ':ref:`$label <${hrefToRefMapping[href]}>`';
+            }
           }
         } else {
           // href is relative
