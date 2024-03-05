@@ -37,7 +37,7 @@ Creates a new :ref:`Client <edgedb-dart-Client>` instance with the provided conn
 Usually it's recommended to not pass any connection options here, and
 instead let the client resolve the connection options from the edgedb
 project or environment variables. See the
-`Client Library Connection </docs/reference/connection>`__
+:ref:`Client Library Connection <ref_reference_connection>`
 documentation for details on connection options and how they are
 resolved.
 
@@ -349,7 +349,7 @@ session config defined on the current client instance.
 
 Equivalent to using the ``configure session`` command. For available
 configuration parameters refer to the
-`Config documentation </docs/stdlib/cfg#client-connections>`__.
+:ref:`Config documentation <ref_std_cfg_client_connections>`.
 
 .. _edgedb-dart-Client-withGlobals:
 
@@ -671,7 +671,7 @@ session config defined on the current :ref:`Session <edgedb-dart-Session>`.
 
 Equivalent to using the ``configure session`` command. For available
 configuration parameters refer to the
-`Config documentation </docs/stdlib/cfg#client-connections>`__.
+:ref:`Config documentation <ref_std_cfg_client_connections>`.
 
 .. _edgedb-dart-Session-withGlobals:
 
@@ -798,7 +798,7 @@ Defines the transaction mode that :ref:`Client.transaction <edgedb-dart-Client-t
 transactions with.
 
 For more details on transaction modes see the
-`Transaction docs </docs/reference/edgeql/tx_start#parameters>`__.
+:ref:`Transaction docs <ref_eql_statements_start_tx>`.
 
 .. _edgedb-dart-TransactionOptions-TransactionOptions:
 
