@@ -150,7 +150,7 @@ The upper boundary of the range, if it exists.
 
 Compares this object to another object.
 
-Returns a value like a `Comparator <https://api.dart.dev/stable/3.3.0/dart-core/Comparator.html>`__ when comparing ``this`` to ``other``.
+Returns a value like a `Comparator <https://api.dart.dev/stable/3.3.1/dart-core/Comparator.html>`__ when comparing ``this`` to ``other``.
 That is, it returns a negative integer if ``this`` is ordered before ``other``,
 a positive integer if ``this`` is ordered after ``other``,
 and zero if ``this`` and ``other`` are ordered together.
@@ -585,7 +585,7 @@ The method has no effect if ``value`` was not in the set.
 
     Set<Range<T>> toSet()
 
-Creates a `Set <https://api.dart.dev/stable/3.3.0/dart-core/Set-class.html>`__ with the same elements and behavior as this ``Set``.
+Creates a `Set <https://api.dart.dev/stable/3.3.1/dart-core/Set-class.html>`__ with the same elements and behavior as this ``Set``.
 
 The returned set behaves the same as this set
 with regard to adding and removing elements.
@@ -606,7 +606,7 @@ the returned set will have the same order.
 A string representation of this object.
 
 Some classes have a default textual representation,
-often paired with a static ``parse`` function (like `int.parse <https://api.dart.dev/stable/3.3.0/dart-core/int/parse.html>`__).
+often paired with a static ``parse`` function (like `int.parse <https://api.dart.dev/stable/3.3.1/dart-core/int/parse.html>`__).
 These classes will provide the textual representation as
 their string representation.
 
@@ -745,7 +745,7 @@ ambiguous 'kB', which can mean 1000 or 1024 bytes.
 A string representation of this object.
 
 Some classes have a default textual representation,
-often paired with a static ``parse`` function (like `int.parse <https://api.dart.dev/stable/3.3.0/dart-core/int/parse.html>`__).
+often paired with a static ``parse`` function (like `int.parse <https://api.dart.dev/stable/3.3.1/dart-core/int/parse.html>`__).
 These classes will provide the textual representation as
 their string representation.
 

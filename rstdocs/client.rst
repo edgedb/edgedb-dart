@@ -74,43 +74,43 @@ in parentheses are also valid for query parameters):
   * - EdgeDB type
     - Dart type
   * - Sets
-    - `List\<dynamic\> <https://api.dart.dev/stable/3.3.0/dart-core/List-class.html>`__
+    - `List\<dynamic\> <https://api.dart.dev/stable/3.3.1/dart-core/List-class.html>`__
   * - Arrays
-    - `List\<dynamic\> <https://api.dart.dev/stable/3.3.0/dart-core/List-class.html>`__
+    - `List\<dynamic\> <https://api.dart.dev/stable/3.3.1/dart-core/List-class.html>`__
   * - Objects
-    - `Map\<String, dynamic\> <https://api.dart.dev/stable/3.3.0/dart-core/Map-class.html>`__
+    - `Map\<String, dynamic\> <https://api.dart.dev/stable/3.3.1/dart-core/Map-class.html>`__
   * - Tuples (``tuple<x, y, ...>``)
-    - `List\<dynamic\> <https://api.dart.dev/stable/3.3.0/dart-core/List-class.html>`__
+    - `List\<dynamic\> <https://api.dart.dev/stable/3.3.1/dart-core/List-class.html>`__
   * - Named tuples (``tuple<foo: x, bar: y, ...>``)
-    - `Map\<String, dynamic\> <https://api.dart.dev/stable/3.3.0/dart-core/Map-class.html>`__
+    - `Map\<String, dynamic\> <https://api.dart.dev/stable/3.3.1/dart-core/Map-class.html>`__
   * - Ranges
     - :ref:`Range\<dynamic\> <edgedb-dart-Range>`
   * - Multiranges
     - :ref:`MultiRange\<dynamic\> <edgedb-dart-MultiRange>`
   * - Enums
-    - `String <https://api.dart.dev/stable/3.3.0/dart-core/String-class.html>`__
+    - `String <https://api.dart.dev/stable/3.3.1/dart-core/String-class.html>`__
   * - ``str``
-    - `String <https://api.dart.dev/stable/3.3.0/dart-core/String-class.html>`__
+    - `String <https://api.dart.dev/stable/3.3.1/dart-core/String-class.html>`__
   * - ``bool``
-    - `bool <https://api.dart.dev/stable/3.3.0/dart-core/bool-class.html>`__
+    - `bool <https://api.dart.dev/stable/3.3.1/dart-core/bool-class.html>`__
   * - ``int16``/``int32``/``int64``
-    - `int <https://api.dart.dev/stable/3.3.0/dart-core/int-class.html>`__
+    - `int <https://api.dart.dev/stable/3.3.1/dart-core/int-class.html>`__
   * - ``float32``/``float64``
-    - `double <https://api.dart.dev/stable/3.3.0/dart-core/double-class.html>`__
+    - `double <https://api.dart.dev/stable/3.3.1/dart-core/double-class.html>`__
   * - ``json``
     - as decoded by ``json.decode()``
   * - ``uuid``
-    - `String <https://api.dart.dev/stable/3.3.0/dart-core/String-class.html>`__
+    - `String <https://api.dart.dev/stable/3.3.1/dart-core/String-class.html>`__
   * - ``bigint``
-    - `BigInt <https://api.dart.dev/stable/3.3.0/dart-core/BigInt-class.html>`__
+    - `BigInt <https://api.dart.dev/stable/3.3.1/dart-core/BigInt-class.html>`__
   * - ``decimal``
     - *(unsupported)*
   * - ``bytes``
-    - `Uint8List <https://api.dart.dev/stable/3.3.0/dart-typed_data/Uint8List-class.html>`__
+    - `Uint8List <https://api.dart.dev/stable/3.3.1/dart-typed_data/Uint8List-class.html>`__
   * - ``datetime``
-    - `DateTime <https://api.dart.dev/stable/3.3.0/dart-core/DateTime-class.html>`__
+    - `DateTime <https://api.dart.dev/stable/3.3.1/dart-core/DateTime-class.html>`__
   * - ``duration``
-    - `Duration <https://api.dart.dev/stable/3.3.0/dart-core/Duration-class.html>`__
+    - `Duration <https://api.dart.dev/stable/3.3.1/dart-core/Duration-class.html>`__
   * - ``cal::local_datetime``
     - `LocalDateTime <https://pub.dev/documentation/edgedb/latest/edgedb/LocalDateTime-class.html>`__
   * - ``cal::local_date``
@@ -124,7 +124,7 @@ in parentheses are also valid for query parameters):
   * - ``cfg::memory``
     - :ref:`ConfigMemory <edgedb-dart-ConfigMemory>`
   * - ``ext::pgvector::vector``
-    - `Float32List <https://api.dart.dev/stable/3.3.0/dart-typed_data/Float32List-class.html>`__ (`List\<double\> <https://api.dart.dev/stable/3.3.0/dart-core/List-class.html>`__)
+    - `Float32List <https://api.dart.dev/stable/3.3.1/dart-typed_data/Float32List-class.html>`__ (`List\<double\> <https://api.dart.dev/stable/3.3.1/dart-core/List-class.html>`__)
 
 Custom types
 ------------
