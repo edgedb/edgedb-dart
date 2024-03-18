@@ -911,7 +911,7 @@ Future<void> parseDSNIntoConfig(
       throw InterfaceError('"branch" in DSN and ${config._database!.source} '
           'are mutually exclusive');
     }
-    handleDSNPart(
+    await handleDSNPart(
       'branch',
       strippedPath,
       config._branch,
@@ -923,14 +923,14 @@ Future<void> parseDSNIntoConfig(
         throw InterfaceError('"database" in DSN and ${config._branch!.source} '
             'are mutually exclusive');
       }
-      handleDSNPart(
+      await handleDSNPart(
         'branch',
         strippedPath,
         config._branch,
         (branch) => config.setBranch(SourcedValue.from(branch)),
       );
     } else {
-      handleDSNPart('database', strippedPath, config._database,
+      await handleDSNPart('database', strippedPath, config._database,
           (db) => config.setDatabase(SourcedValue.from(db)), stripLeadingSlash);
     }
   }
