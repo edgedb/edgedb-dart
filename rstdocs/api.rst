@@ -20,6 +20,7 @@ API
       String? host, 
       int? port, 
       String? database, 
+      String? branch, 
       String? user, 
       String? password, 
       String? secretKey, 

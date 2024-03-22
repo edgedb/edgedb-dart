@@ -118,7 +118,8 @@ final errorMapping = {
   'file_not_found': RegExp(r"cannot open file"),
   'invalid_tls_security': RegExp(
       r"^invalid 'tlsSecurity' value|'tlsSecurity' value cannot be lower than security level set by EDGEDB_CLIENT_SECURITY"),
-  'exclusive_options': RegExp(r"^Cannot specify both .* and .*"),
+  'exclusive_options':
+      RegExp(r"^Cannot specify both .* and .*|are mutually exclusive"),
   'secret_key_not_found':
       RegExp(r"^Cannot connect to cloud instances without a secret key"),
   'invalid_secret_key': RegExp(r"^Invalid secret key"),
@@ -189,6 +190,7 @@ Future<void> runConnectionTest(Map<String, dynamic> testcase) async {
       expect({
         'address': [params.address.host, params.address.port],
         'database': params.database,
+        'branch': params.branch,
         'user': params.user,
         'password': params.password,
         'secretKey': params.secretKey,
