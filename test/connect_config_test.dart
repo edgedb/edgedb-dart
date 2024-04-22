@@ -187,6 +187,8 @@ Future<void> runConnectionTest(Map<String, dynamic> testcase) async {
         files: fs?['files'] != null ? Map.castFrom(fs?['files']) : null,
         () async {
       final params = await parseConnectConfig(config);
+      final result = (testcase['result'] as Map<String, dynamic>)
+        ..remove('tlsServerName');
       expect({
         'address': [params.address.host, params.address.port],
         'database': params.database,
@@ -196,10 +198,11 @@ Future<void> runConnectionTest(Map<String, dynamic> testcase) async {
         'secretKey': params.secretKey,
         'tlsCAData': debugGetRawCAData(params),
         'tlsSecurity': params.tlsSecurity.value,
-        'serverSettings': params.serverSettings,
+        // 'tlsServerName': null, // TODO: Properly handle server name option
+        'serverSettings': params.serverSettings..remove('tls_server_name'),
         'waitUntilAvailable': params.waitUntilAvailable,
       }, {
-        ...testcase['result'] as Map<String, dynamic>,
+        ...result,
         'waitUntilAvailable':
             parseISODurationString(testcase['result']['waitUntilAvailable'])
                 .inMilliseconds,

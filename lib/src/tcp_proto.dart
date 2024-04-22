@@ -53,6 +53,7 @@ class TCPProtocol extends BaseProtocol {
 
       await conn._connectHandshake(
           database: config.database,
+          branch: config.branch,
           user: config.user,
           password: config.password,
           secretKey: config.secretKey);
@@ -93,6 +94,7 @@ class TCPProtocol extends BaseProtocol {
 
   Future<void> _connectHandshake(
       {required String database,
+      required String branch,
       required String user,
       String? password,
       String? secretKey}) async {
@@ -103,6 +105,7 @@ class TCPProtocol extends BaseProtocol {
     final params = {
       'user': user,
       'database': database,
+      'branch': branch,
     };
     if (secretKey != null) {
       params['secret_key'] = secretKey;
