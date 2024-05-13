@@ -48,6 +48,7 @@ class ConnectConfig {
   String? host;
   int? port;
   String? database;
+  String? branch;
   String? user;
   String? password;
   String? secretKey;
@@ -65,6 +66,7 @@ class ConnectConfig {
       this.host,
       this.port,
       this.database,
+      this.branch,
       this.user,
       this.password,
       this.secretKey,
@@ -82,6 +84,7 @@ class ConnectConfig {
         host = json['host'],
         port = json['port'],
         database = json['database'],
+        branch = json['branch'],
         user = json['user'],
         password = json['password'],
         secretKey = json['secretKey'],
@@ -108,6 +111,7 @@ class ConnectConfig {
       'host': host,
       'port': port,
       'database': database,
+      'branch': branch,
       'user': user,
       'password': password,
       'secretKey': secretKey,
@@ -143,6 +147,7 @@ class ResolvedConnectConfig {
   SourcedValue<String>? _host;
   SourcedValue<int>? _port;
   SourcedValue<String>? _database;
+  SourcedValue<String>? _branch;
   SourcedValue<String>? _user;
   SourcedValue<String>? _password;
   SourcedValue<String>? _secretKey;
@@ -171,6 +176,15 @@ class ResolvedConnectConfig {
         throw InterfaceError("invalid database name: '${db.value}'");
       }
       _database = SourcedValue.from(db);
+    }
+  }
+
+  void setBranch(SourcedValue<String?> branch) {
+    if (_branch == null && branch.value != null) {
+      if (branch.value == '') {
+        throw InterfaceError("invalid branch name: '${branch.value}'");
+      }
+      _branch = SourcedValue.from(branch);
     }
   }
 
@@ -286,7 +300,11 @@ class ResolvedConnectConfig {
   }
 
   String get database {
-    return _database?.value ?? 'edgedb';
+    return _database?.value ?? _branch?.value ?? 'edgedb';
+  }
+
+  String get branch {
+    return _database?.value ?? _branch?.value ?? '__default__';
   }
 
   String get user {
@@ -375,6 +393,11 @@ class ResolvedConnectConfig {
       "database",
       database,
       _database,
+    );
+    outputLine(
+      "branch",
+      branch,
+      _branch,
     );
     outputLine(
       "user",
@@ -520,6 +543,7 @@ Future<ResolvedConnectConfig> parseConnectConfig(ConnectConfig config) async {
     host: SourcedValue(config.host, "'host' option"),
     port: SourcedValue(config.port, "'port' option"),
     database: SourcedValue(config.database, "'database' option"),
+    branch: SourcedValue(config.branch, "'branch' option"),
     user: SourcedValue(config.user, "'user' option"),
     password: SourcedValue(config.password, "'password' option"),
     secretKey: SourcedValue(config.secretKey, "'secretKey' option"),
@@ -564,6 +588,8 @@ Future<ResolvedConnectConfig> parseConnectConfig(ConnectConfig config) async {
       port: SourcedValue(port, "'EDGEDB_PORT' environment variable"),
       database: SourcedValue(getEnvVar('EDGEDB_DATABASE'),
           "'EDGEDB_DATABASE' environment variable"),
+      branch: SourcedValue(
+          getEnvVar('EDGEDB_BRANCH'), "'EDGEDB_BRANCH' environment variable"),
       user: SourcedValue(
           getEnvVar('EDGEDB_USER'), "'EDGEDB_USER' environment variable"),
       password: SourcedValue(getEnvVar('EDGEDB_PASSWORD'),
@@ -643,6 +669,7 @@ Future<bool> resolveConfigOptions(ResolvedConnectConfig resolvedConfig,
     SourcedValue<String?>? host,
     SourcedValue<dynamic>? port,
     SourcedValue<String?>? database,
+    SourcedValue<String?>? branch,
     SourcedValue<String?>? user,
     SourcedValue<String?>? password,
     SourcedValue<String?>? secretKey,
@@ -657,7 +684,20 @@ Future<bool> resolveConfigOptions(ResolvedConnectConfig resolvedConfig,
         'Cannot specify both ${tlsCA!.source} and ${tlsCAFile?.source}');
   }
 
-  if (database != null) resolvedConfig.setDatabase(database);
+  if (database?.value != null) {
+    if (branch?.value != null) {
+      throw InterfaceError(
+          '${database!.source} and ${branch!.source} are mutually exclusive');
+    }
+    if (resolvedConfig._branch == null) {
+      // Only update the config if 'branch' has not been already resolved.
+      resolvedConfig.setDatabase(database!);
+    }
+  }
+  if (branch?.value != null && resolvedConfig._database == null) {
+    // Only update the config if 'database' has not been already resolved.
+    resolvedConfig.setBranch(branch!);
+  }
   if (user != null) resolvedConfig.setUser(user);
   if (password != null) resolvedConfig.setPassword(password);
   if (secretKey != null) resolvedConfig.setSecretKey(secretKey);
@@ -729,7 +769,13 @@ Future<bool> resolveConfigOptions(ResolvedConnectConfig resolvedConfig,
 
       resolvedConfig.setHost(SourcedValue(creds.host, source));
       resolvedConfig.setPort(SourcedValue(creds.port, source));
-      resolvedConfig.setDatabase(SourcedValue(creds.database, source));
+      if (creds.database != null && resolvedConfig._branch == null) {
+        // Only update the config if 'branch' has not been already resolved.
+        resolvedConfig.setDatabase(SourcedValue(creds.database, source));
+      } else if (creds.branch != null && resolvedConfig._database == null) {
+        // Only update the config if 'database' has not been already resolved.
+        resolvedConfig.setBranch(SourcedValue(creds.branch, source));
+      }
       resolvedConfig.setUser(SourcedValue(creds.user, source));
       resolvedConfig.setPassword(SourcedValue(creds.password, source));
       resolvedConfig.setTlsCAData(SourcedValue(creds.tlsCAData, source));
@@ -834,13 +880,49 @@ Future<void> parseDSNIntoConfig(
     return str.startsWith('/') ? str.substring(1) : str;
   }
 
-  final strippedPath = stripLeadingSlash(parsed.path);
-  await handleDSNPart(
-      'database',
-      strippedPath.isNotEmpty ? strippedPath : null,
-      config._database,
-      (db) => config.setDatabase(SourcedValue.from(db)),
-      stripLeadingSlash);
+  String? strippedPath = stripLeadingSlash(parsed.path);
+  strippedPath = strippedPath.isNotEmpty ? strippedPath : null;
+  final databaseInParams = searchParams.containsKey('database') ||
+      searchParams.containsKey('database_env') ||
+      searchParams.containsKey('database_file');
+  final branchInParams = searchParams.containsKey('branch') ||
+      searchParams.containsKey('branch_env') ||
+      searchParams.containsKey('branch_file');
+
+  if (branchInParams) {
+    if (databaseInParams) {
+      throw InterfaceError(
+          'invalid DSN: "database" and "branch" cannot be present '
+          'at the same time');
+    }
+    if (config._database == null) {
+      // Only update the config if 'database' has not been already resolved.
+      await handleDSNPart(
+        'branch',
+        strippedPath,
+        config._branch,
+        (branch) => config.setBranch(SourcedValue.from(branch)),
+      );
+    } else {
+      // Clean up the query, if config already has 'database'
+      searchParams
+        ..remove('branch')
+        ..remove('branch_env')
+        ..remove('branch_file');
+    }
+  } else {
+    if (config._branch == null) {
+      // Only update the config if 'branch' has not been already resolved.
+      await handleDSNPart('database', strippedPath, config._database,
+          (db) => config.setDatabase(SourcedValue.from(db)), stripLeadingSlash);
+    } else {
+      // Clean up the query, if config already has 'branch'
+      searchParams
+        ..remove('database')
+        ..remove('database_env')
+        ..remove('database_file');
+    }
+  }
 
   final auth = parsed.userInfo.split(':');
   await handleDSNPart('user', auth[0].isNotEmpty ? auth[0] : null, config._user,

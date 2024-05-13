@@ -12,7 +12,10 @@ class Credentials {
   int? port;
   String user;
   String? password;
+  // It's OK for database and branch to appear in credentials, as long as
+  // they match.
   String? database;
+  String? branch;
   String? tlsCAData;
   TLSSecurity? tlsSecurity;
 
@@ -22,8 +25,11 @@ class Credentials {
       required this.user,
       this.password,
       this.database,
+      this.branch,
       this.tlsCAData,
-      this.tlsSecurity});
+      this.tlsSecurity})
+      : assert(database == null || branch == null || database == branch,
+            'if Credentials contains both "database" and "branch" they must match');
 }
 
 Future<String> getCredentialsPath(String instanceName) async {
@@ -65,6 +71,16 @@ Credentials validateCredentials(dynamic data) {
   final database = data['database'];
   if (database != null && database is! String) {
     throw InterfaceError("'database' must be a String");
+  }
+
+  final branch = data['branch'];
+  if (branch != null) {
+    if (branch is! String) {
+      throw InterfaceError("'branch' must be a String");
+    }
+    if (database != null && branch != database) {
+      throw InterfaceError("'database' and 'branch' cannot be different");
+    }
   }
 
   final password = data['password'];
@@ -122,6 +138,7 @@ Credentials validateCredentials(dynamic data) {
       port: port,
       user: user,
       database: database,
+      branch: branch,
       password: password,
       tlsCAData: caData,
       tlsSecurity: tlsSecurity ?? verifyHostname);

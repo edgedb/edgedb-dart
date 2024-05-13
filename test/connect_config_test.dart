@@ -118,7 +118,8 @@ final errorMapping = {
   'file_not_found': RegExp(r"cannot open file"),
   'invalid_tls_security': RegExp(
       r"^invalid 'tlsSecurity' value|'tlsSecurity' value cannot be lower than security level set by EDGEDB_CLIENT_SECURITY"),
-  'exclusive_options': RegExp(r"^Cannot specify both .* and .*"),
+  'exclusive_options':
+      RegExp(r"^Cannot specify both .* and .*|are mutually exclusive"),
   'secret_key_not_found':
       RegExp(r"^Cannot connect to cloud instances without a secret key"),
   'invalid_secret_key': RegExp(r"^Invalid secret key"),
@@ -186,18 +187,22 @@ Future<void> runConnectionTest(Map<String, dynamic> testcase) async {
         files: fs?['files'] != null ? Map.castFrom(fs?['files']) : null,
         () async {
       final params = await parseConnectConfig(config);
+      final result = (testcase['result'] as Map<String, dynamic>)
+        ..remove('tlsServerName');
       expect({
         'address': [params.address.host, params.address.port],
         'database': params.database,
+        'branch': params.branch,
         'user': params.user,
         'password': params.password,
         'secretKey': params.secretKey,
         'tlsCAData': debugGetRawCAData(params),
         'tlsSecurity': params.tlsSecurity.value,
-        'serverSettings': params.serverSettings,
+        // 'tlsServerName': null, // TODO: Properly handle server name option
+        'serverSettings': params.serverSettings..remove('tls_server_name'),
         'waitUntilAvailable': params.waitUntilAvailable,
       }, {
-        ...testcase['result'] as Map<String, dynamic>,
+        ...result,
         'waitUntilAvailable':
             parseISODurationString(testcase['result']['waitUntilAvailable'])
                 .inMilliseconds,

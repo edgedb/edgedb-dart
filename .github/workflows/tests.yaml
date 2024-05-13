@@ -21,6 +21,8 @@ jobs:
         include:
           - os: ubuntu-latest
             edgedb-version: "nightly"
+          - os: ubuntu-latest
+            edgedb-version: "3" # LTS
 
     steps:
       - uses: actions/checkout@v1
