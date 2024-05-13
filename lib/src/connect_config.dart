@@ -689,17 +689,13 @@ Future<bool> resolveConfigOptions(ResolvedConnectConfig resolvedConfig,
       throw InterfaceError(
           '${database!.source} and ${branch!.source} are mutually exclusive');
     }
-    if (resolvedConfig._branch != null) {
-      throw InterfaceError(
-          '${database!.source} and ${resolvedConfig._branch!.source} are mutually exclusive');
+    if (resolvedConfig._branch == null) {
+      // Only update the config if 'branch' has not been already resolved.
+      resolvedConfig.setDatabase(database!);
     }
-    resolvedConfig.setDatabase(database!);
   }
-  if (branch?.value != null) {
-    if (resolvedConfig._database != null) {
-      throw InterfaceError(
-          '${resolvedConfig._database!.source} and ${branch!.source} are mutually exclusive');
-    }
+  if (branch?.value != null && resolvedConfig._database == null) {
+    // Only update the config if 'database' has not been already resolved.
     resolvedConfig.setBranch(branch!);
   }
   if (user != null) resolvedConfig.setUser(user);
@@ -773,19 +769,11 @@ Future<bool> resolveConfigOptions(ResolvedConnectConfig resolvedConfig,
 
       resolvedConfig.setHost(SourcedValue(creds.host, source));
       resolvedConfig.setPort(SourcedValue(creds.port, source));
-      if (creds.database != null) {
-        if (resolvedConfig._branch != null) {
-          throw InterfaceError(
-              '${resolvedConfig._branch!.source} and "database" '
-              'in credentials are mutually exclusive');
-        }
+      if (creds.database != null && resolvedConfig._branch == null) {
+        // Only update the config if 'branch' has not been already resolved.
         resolvedConfig.setDatabase(SourcedValue(creds.database, source));
-      } else if (creds.branch != null) {
-        if (resolvedConfig._database != null) {
-          throw InterfaceError(
-              '${resolvedConfig._database!.source} in configuration and "branch" '
-              'in credentials are mutually exclusive');
-        }
+      } else if (creds.branch != null && resolvedConfig._database == null) {
+        // Only update the config if 'database' has not been already resolved.
         resolvedConfig.setBranch(SourcedValue(creds.branch, source));
       }
       resolvedConfig.setUser(SourcedValue(creds.user, source));
@@ -907,22 +895,8 @@ Future<void> parseDSNIntoConfig(
           'invalid DSN: "database" and "branch" cannot be present '
           'at the same time');
     }
-    if (config._database != null) {
-      throw InterfaceError('"branch" in DSN and ${config._database!.source} '
-          'are mutually exclusive');
-    }
-    await handleDSNPart(
-      'branch',
-      strippedPath,
-      config._branch,
-      (branch) => config.setBranch(SourcedValue.from(branch)),
-    );
-  } else {
-    if (config._branch != null) {
-      if (databaseInParams) {
-        throw InterfaceError('"database" in DSN and ${config._branch!.source} '
-            'are mutually exclusive');
-      }
+    if (config._database == null) {
+      // Only update the config if 'database' has not been already resolved.
       await handleDSNPart(
         'branch',
         strippedPath,
@@ -930,8 +904,23 @@ Future<void> parseDSNIntoConfig(
         (branch) => config.setBranch(SourcedValue.from(branch)),
       );
     } else {
+      // Clean up the query, if config already has 'database'
+      searchParams
+        ..remove('branch')
+        ..remove('branch_env')
+        ..remove('branch_file');
+    }
+  } else {
+    if (config._branch == null) {
+      // Only update the config if 'branch' has not been already resolved.
       await handleDSNPart('database', strippedPath, config._database,
           (db) => config.setDatabase(SourcedValue.from(db)), stripLeadingSlash);
+    } else {
+      // Clean up the query, if config already has 'branch'
+      searchParams
+        ..remove('database')
+        ..remove('database_env')
+        ..remove('database_file');
     }
   }
 
