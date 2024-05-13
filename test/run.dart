@@ -147,7 +147,6 @@ Future<ServerInst> startServer(List<String> cmd, File statusFile) async {
       port: runtimeData['port'],
       user: 'edgedb',
       password: 'edgedbtest',
-      database: 'edgedb',
       tlsSecurity: TLSSecurity.noHostVerification,
       tlsCAFile: runtimeData['tls_cert_file']);
 
