@@ -1,3 +1,8 @@
+# 0.5.0
+
+- Add support for branching in EdgeDB 5.0 (`branch` option / `EDGEDB_BRANCH`
+  env var / `branch` param in DSN)
+
 # 0.4.1
 
 - Fix bug in set codec type casting, that was causing an error when codegen
