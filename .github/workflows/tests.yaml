@@ -25,21 +25,21 @@ jobs:
             edgedb-version: "3" # LTS
 
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 50
           submodules: true
 
       - name: Setup WSL
         if: ${{ matrix.os == 'windows-2019' }}
-        uses: vampire/setup-wsl@v1
+        uses: vampire/setup-wsl@v3
         with:
           wsl-shell-user: edgedb
           additional-packages: ca-certificates
             curl
 
       - name: Set up Dart
-        uses: dart-lang/setup-dart@v1.3
+        uses: dart-lang/setup-dart@v1
 
       - name: Install dependencies
         run: dart pub get
