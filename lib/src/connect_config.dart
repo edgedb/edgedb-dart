@@ -1001,5 +1001,5 @@ Future<void> parseCloudInstanceNameIntoConfig(ResolvedConnectConfig config,
 
 dynamic _jwtBase64Decode(String payload) {
   return json.decode(utf8.decode(
-      base64.decode(payload.padRight((payload.length ~/ 4 + 1) * 4, '='))));
+      base64.decode(payload.padRight((payload.length / 4).ceil() * 4, '='))));
 }
