@@ -162,7 +162,8 @@ Future<void> processIndexPage(
   final heading = pageParts[0];
   final content = pageParts[1];
 
-  final indexPage = '''.. _edgedb-dart-intro:
+  final indexPage = '''.. edb:tag:: dart
+  .. _edgedb-dart-intro:
 
 $heading
 
