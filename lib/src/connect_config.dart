@@ -794,9 +794,9 @@ Future<void> parseDSNIntoConfig(
     throw InterfaceError("invalid DSN or instance name: '${dsnString.value}'");
   }
 
-  if (!parsed.isScheme('edgedb')) {
+  if (!parsed.isScheme('edgedb') && !parsed.isScheme('gel')) {
     throw InterfaceError(
-        "invalid DSN: schema is expected to be 'edgedb', got '${parsed.scheme}'");
+        "invalid DSN: schema is expected to be 'gel', got '${parsed.scheme}'");
   }
 
   final searchParams = <String, String>{};
