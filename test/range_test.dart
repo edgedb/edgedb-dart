@@ -1531,7 +1531,7 @@ void main() {
         u.subtract(Duration(days: 1)),
         u,
         u.add(Duration(days: 1)),
-        DateTime(275760, 09, 13)
+        DateTime(275760, 09, 12)
       ];
 
       expect(ranges.map((range) => elements.map((el) => range.contains(el))), [
@@ -1638,7 +1638,7 @@ void main() {
       final l = DateTime(2022, 08, 30);
       final u = DateTime(2022, 09, 02);
       final min = DateTime(-271821, 04, 21);
-      final max = DateTime(275760, 09, 13);
+      final max = DateTime(275760, 09, 12);
 
       final ranges = <Range<DateTime>>[
         Range(l, u, incLower: true, incUpper: false),
