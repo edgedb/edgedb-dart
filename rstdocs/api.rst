@@ -12,8 +12,8 @@ API
 
 .. code-block:: dart
 
-    Client createClient(
-      {String? dsn, 
+    Client createClient({ 
+      String? dsn, 
       String? instanceName, 
       String? credentials, 
       String? credentialsFile, 
@@ -30,7 +30,7 @@ API
       TLSSecurity? tlsSecurity, 
       Duration? waitUntilAvailable, 
       ConnectConfig? config, 
-      int? concurrency}
+      int? concurrency, }
     )
 
 Creates a new :ref:`Client <edgedb-dart-Client>` instance with the provided connection options.
@@ -139,9 +139,9 @@ mis-configuration).
 
 .. code-block:: dart
 
-    Future<void> execute(
-      String query, 
-      [dynamic args]
+    Future<void> execute( 
+      String query, [
+      dynamic args]
     )
 
 Executes a query, returning no result.
@@ -157,9 +157,9 @@ For details on ``args`` see the ``edgedb`` library
 
 .. code-block:: dart
 
-    Future<List> query(
-      String query, 
-      [dynamic args]
+    Future<List> query( 
+      String query, [
+      dynamic args]
     )
 
 Executes a query, returning a ``List`` of results.
@@ -175,9 +175,9 @@ For details on result types and ``args`` see the ``edgedb`` library
 
 .. code-block:: dart
 
-    Future<String> queryJSON(
-      String query, 
-      [dynamic args]
+    Future<String> queryJSON( 
+      String query, [
+      dynamic args]
     )
 
 Executes a query, returning the result as a JSON encoded ``String``.
@@ -193,9 +193,9 @@ For details on ``args`` see the ``edgedb`` library
 
 .. code-block:: dart
 
-    Future queryRequiredSingle(
-      String query, 
-      [dynamic args]
+    Future queryRequiredSingle( 
+      String query, [
+      dynamic args]
     )
 
 Executes a query, returning a single (non-``null``) result.
@@ -215,9 +215,9 @@ For details on result types and ``args`` see the ``edgedb`` library
 
 .. code-block:: dart
 
-    Future<String> queryRequiredSingleJSON(
-      String query, 
-      [dynamic args]
+    Future<String> queryRequiredSingleJSON( 
+      String query, [
+      dynamic args]
     )
 
 Executes a query, returning the result as a JSON encoded ``String``.
@@ -237,9 +237,9 @@ For details on ``args`` see the ``edgedb`` library
 
 .. code-block:: dart
 
-    Future querySingle(
-      String query, 
-      [dynamic args]
+    Future querySingle( 
+      String query, [
+      dynamic args]
     )
 
 Executes a query, returning a single (possibly ``null``) result.
@@ -258,9 +258,9 @@ For details on result types and ``args`` see the ``edgedb`` library
 
 .. code-block:: dart
 
-    Future<String> querySingleJSON(
-      String query, 
-      [dynamic args]
+    Future<String> querySingleJSON( 
+      String query, [
+      dynamic args]
     )
 
 Executes a query, returning the result as a JSON encoded ``String``.
@@ -292,8 +292,8 @@ for any running queries to finish.
 
 .. code-block:: dart
 
-    Future<T> transaction<T>(
-      Future<T> action(Transaction)
+    Future<T> transaction<T>( 
+      Future<T> action( Transaction)
     )
 
 Execute a retryable transaction.
@@ -338,7 +338,7 @@ with :ref:`withRetryOptions() <edgedb-dart-Client-withRetryOptions>`.
 
 .. code-block:: dart
 
-    Client withConfig(
+    Client withConfig( 
       Map<String, Object> config
     )
 
@@ -360,7 +360,7 @@ configuration parameters refer to the
 
 .. code-block:: dart
 
-    Client withGlobals(
+    Client withGlobals( 
       Map<String, dynamic> globals
     )
 
@@ -389,7 +389,7 @@ Example:
 
 .. code-block:: dart
 
-    Client withModuleAliases(
+    Client withModuleAliases( 
       Map<String, String> aliases
     )
 
@@ -421,7 +421,7 @@ Example:
 
 .. code-block:: dart
 
-    Client withRetryOptions(
+    Client withRetryOptions( 
       RetryOptions options
     )
 
@@ -435,7 +435,7 @@ Returns a new :ref:`Client <edgedb-dart-Client>` instance with the specified :re
 
 .. code-block:: dart
 
-    Client withSession(
+    Client withSession( 
       Session session
     )
 
@@ -453,7 +453,7 @@ methods for convenience.
 
 .. code-block:: dart
 
-    Client withTransactionOptions(
+    Client withTransactionOptions( 
       TransactionOptions options
     )
 
@@ -475,10 +475,10 @@ Manages all options (:ref:`RetryOptions <edgedb-dart-RetryOptions>`, :ref:`Trans
 
 .. code-block:: dart
 
-    Options(
-      {RetryOptions? retryOptions, 
+    Options({ 
+      RetryOptions? retryOptions, 
       TransactionOptions? transactionOptions, 
-      Session? session}
+      Session? session, }
     )
 
 
@@ -535,7 +535,7 @@ Creates a new :ref:`Options <edgedb-dart-Options>` object with all options set t
 
 .. code-block:: dart
 
-    Options withRetryOptions(
+    Options withRetryOptions( 
       RetryOptions options
     )
 
@@ -549,7 +549,7 @@ Returns a new :ref:`Options <edgedb-dart-Options>` object with the specified :re
 
 .. code-block:: dart
 
-    Options withSession(
+    Options withSession( 
       Session session
     )
 
@@ -563,7 +563,7 @@ Returns a new :ref:`Options <edgedb-dart-Options>` object with the specified :re
 
 .. code-block:: dart
 
-    Options withTransactionOptions(
+    Options withTransactionOptions( 
       TransactionOptions options
     )
 
@@ -585,11 +585,11 @@ to be used when executing a query.
 
 .. code-block:: dart
 
-    Session(
-      {String module = 'default', 
+    Session({ 
+      String module = 'default', 
       Map<String, String>? moduleAliases, 
       Map<String, Object>? config, 
-      Map<String, dynamic>? globals}
+      Map<String, dynamic>? globals, }
     )
 
 Creates a new :ref:`Session <edgedb-dart-Session>` object with the given options.
@@ -660,7 +660,7 @@ Creates a new :ref:`Session <edgedb-dart-Session>` with all options set to their
 
 .. code-block:: dart
 
-    Session withConfig(
+    Session withConfig( 
       Map<String, Object> config
     )
 
@@ -682,7 +682,7 @@ configuration parameters refer to the
 
 .. code-block:: dart
 
-    Session withGlobals(
+    Session withGlobals( 
       Map<String, dynamic> globals
     )
 
@@ -701,7 +701,7 @@ Equivalent to using the ``set global`` command.
 
 .. code-block:: dart
 
-    Session withModuleAliases(
+    Session withModuleAliases( 
       Map<String, String> aliases
     )
 
@@ -736,9 +736,9 @@ which override the default for given error conditions.
 
 .. code-block:: dart
 
-    RetryOptions(
-      {int? attempts, 
-      BackoffFunction? backoff}
+    RetryOptions({ 
+      int? attempts, 
+      BackoffFunction? backoff, }
     )
 
 Creates a new :ref:`RetryOptions <edgedb-dart-RetryOptions>` object, with a default `RetryRule <https://pub.dev/documentation/edgedb/latest/edgedb/RetryRule-class.html>`__, with
@@ -778,10 +778,10 @@ Creates a new :ref:`RetryOptions <edgedb-dart-RetryOptions>` with all options se
 
 .. code-block:: dart
 
-    RetryOptions withRule(
-      {required RetryCondition condition, 
+    RetryOptions withRule({ 
+      required RetryCondition condition, 
       int? attempts, 
-      BackoffFunction? backoff}
+      BackoffFunction? backoff, }
     )
 
 Adds a new `RetryRule <https://pub.dev/documentation/edgedb/latest/edgedb/RetryRule-class.html>`__ with the given ``attempts`` and ``backoff`` function,
@@ -809,10 +809,10 @@ For more details on transaction modes see the
 
 .. code-block:: dart
 
-    TransactionOptions(
-      {IsolationLevel? isolation, 
+    TransactionOptions({ 
+      IsolationLevel? isolation, 
       bool? readonly, 
-      bool? deferrable}
+      bool? deferrable, }
     )
 
 Creates a new :ref:`TransactionOptions <edgedb-dart-TransactionOptions>` object with the given ``isolation``,
