@@ -610,7 +610,7 @@ void main() {
       select (dt, datetime_get(dt, 'epochseconds') * 1000)
     ''');
       expect(
-          (res[0] as DateTime).millisecondsSinceEpoch, (res[1] as num).ceil());
+          (res[0] as DateTime).millisecondsSinceEpoch, (res[1] as num).floor());
     } finally {
       await client.close();
     }

@@ -38,11 +38,11 @@ as the result of some operation on a range.
 
 .. code-block:: dart
 
-    Range<T>(
+    Range<T>( 
       T? lower, 
-      T? upper, 
-      {bool? incLower, 
-      bool? incUpper}
+      T? upper, {
+      bool? incLower, 
+      bool? incUpper, }
     )
 
 Creates a new :ref:`Range <edgedb-dart-Range>`.
@@ -144,13 +144,13 @@ The upper boundary of the range, if it exists.
 
 .. code-block:: dart
 
-    int compareTo(
+    int compareTo( 
       Range<T> other
     )
 
 Compares this object to another object.
 
-Returns a value like a `Comparator <https://api.dart.dev/stable/3.4.4/dart-core/Comparator.html>`__ when comparing ``this`` to ``other``.
+Returns a value like a `Comparator <https://api.dart.dev/stable/3.5.4/dart-core/Comparator.html>`__ when comparing ``this`` to ``other``.
 That is, it returns a negative integer if ``this`` is ordered before ``other``,
 a positive integer if ``this`` is ordered after ``other``,
 and zero if ``this`` and ``other`` are ordered together.
@@ -165,7 +165,7 @@ The ``other`` argument must be a value that is comparable to this object.
 
 .. code-block:: dart
 
-    bool contains(
+    bool contains( 
       T element
     )
 
@@ -179,7 +179,7 @@ Checks whether ``element`` is within this range.
 
 .. code-block:: dart
 
-    bool containsRange(
+    bool containsRange( 
       Range<T> range
     )
 
@@ -193,7 +193,7 @@ Checks whether ``range`` is entirely within this range.
 
 .. code-block:: dart
 
-    bool overlaps(
+    bool overlaps( 
       Range<T> other
     )
 
@@ -233,8 +233,8 @@ boundaries by ``()``. If the range is empty, returns the string ``'empty'``.
 
 .. code-block:: dart
 
-    Iterable<T> unpack(
-      {Object? step}
+    Iterable<T> unpack({ 
+      Object? step, }
     )
 
 If the range is discrete and no ``step`` is provided, returns an ``Iterable``
@@ -254,7 +254,7 @@ non-discrete ranges.
 
 .. code-block:: dart
 
-    Range<T> operator *(
+    Range<T> operator *( 
       Range<T> other
     )
 
@@ -268,7 +268,7 @@ Returns the intersection of two ranges.
 
 .. code-block:: dart
 
-    Range<T> operator +(
+    Range<T> operator +( 
       Range<T> other
     )
 
@@ -284,7 +284,7 @@ Throws an error if the result is not a single continuous range.
 
 .. code-block:: dart
 
-    Range<T> operator -(
+    Range<T> operator -( 
       Range<T> other
     )
 
@@ -300,7 +300,7 @@ Throws an error if the result is not a single continuous range.
 
 .. code-block:: dart
 
-    bool operator <(
+    bool operator <( 
       Range<T> other
     )
 
@@ -320,7 +320,7 @@ lower/greater than specified lower/upper bounds respectively.
 
 .. code-block:: dart
 
-    bool operator <=(
+    bool operator <=( 
       Range<T> other
     )
 
@@ -340,7 +340,7 @@ lower/greater than specified lower/upper bounds respectively.
 
 .. code-block:: dart
 
-    bool operator ==(
+    bool operator ==( 
       Object other
     )
 
@@ -354,7 +354,7 @@ Returns whether two ranges are equal.
 
 .. code-block:: dart
 
-    bool operator >(
+    bool operator >( 
       Range<T> other
     )
 
@@ -374,7 +374,7 @@ lower/greater than specified lower/upper bounds respectively.
 
 .. code-block:: dart
 
-    bool operator >=(
+    bool operator >=( 
       Range<T> other
     )
 
@@ -399,7 +399,7 @@ lower/greater than specified lower/upper bounds respectively.
 
 .. code-block:: dart
 
-    MultiRange<T>(
+    MultiRange<T>( 
       Iterable<Range<T>> ranges
     )
 
@@ -441,7 +441,7 @@ but must be consistent between changes to the set.
 
     int get length
 
-The number of elements in :ref:`this <edgedb-dart-MultiRange>`.
+The number of elements in this `Iterable <https://api.dart.dev/stable/3.5.4/dart-core/Iterable-class.html>`__.
 
 Counting all elements may involve iterating through all elements and can
 therefore be slow.
@@ -456,7 +456,7 @@ These *must* override the default implementation of ``length``.
 
 .. code-block:: dart
 
-    bool add(
+    bool add( 
       Range<T> value
     )
 
@@ -495,7 +495,7 @@ Example:
 
 .. code-block:: dart
 
-    bool contains(
+    bool contains( 
       Object? element
     )
 
@@ -515,7 +515,7 @@ Whether ``value`` is in the set.
 
 .. code-block:: dart
 
-    Range<T>? lookup(
+    Range<T>? lookup( 
       Object? element
     )
 
@@ -548,7 +548,7 @@ set element.
 
 .. code-block:: dart
 
-    bool remove(
+    bool remove( 
       Object? value
     )
 
@@ -585,7 +585,7 @@ The method has no effect if ``value`` was not in the set.
 
     Set<Range<T>> toSet()
 
-Creates a `Set <https://api.dart.dev/stable/3.4.4/dart-core/Set-class.html>`__ with the same elements and behavior as this ``Set``.
+Creates a `Set <https://api.dart.dev/stable/3.5.4/dart-core/Set-class.html>`__ with the same elements and behavior as this ``Set``.
 
 The returned set behaves the same as this set
 with regard to adding and removing elements.
@@ -606,7 +606,7 @@ the returned set will have the same order.
 A string representation of this object.
 
 Some classes have a default textual representation,
-often paired with a static ``parse`` function (like `int.parse <https://api.dart.dev/stable/3.4.4/dart-core/int/parse.html>`__).
+often paired with a static ``parse`` function (like `int.parse <https://api.dart.dev/stable/3.5.4/dart-core/int/parse.html>`__).
 These classes will provide the textual representation as
 their string representation.
 
@@ -624,7 +624,7 @@ mainly for debugging or logging.
 
 .. code-block:: dart
 
-    bool operator ==(
+    bool operator ==( 
       Object other
     )
 
@@ -648,7 +648,7 @@ ambiguous 'kB', which can mean 1000 or 1024 bytes.
 
 .. code-block:: dart
 
-    ConfigMemory(
+    ConfigMemory( 
       int _bytes
     )
 
@@ -661,7 +661,7 @@ ambiguous 'kB', which can mean 1000 or 1024 bytes.
 
 .. code-block:: dart
 
-    ConfigMemory.parse(
+    ConfigMemory.parse( 
       String mem
     )
 
@@ -745,7 +745,7 @@ ambiguous 'kB', which can mean 1000 or 1024 bytes.
 A string representation of this object.
 
 Some classes have a default textual representation,
-often paired with a static ``parse`` function (like `int.parse <https://api.dart.dev/stable/3.4.4/dart-core/int/parse.html>`__).
+often paired with a static ``parse`` function (like `int.parse <https://api.dart.dev/stable/3.5.4/dart-core/int/parse.html>`__).
 These classes will provide the textual representation as
 their string representation.
 
