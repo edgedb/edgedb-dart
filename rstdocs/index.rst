@@ -1,5 +1,4 @@
-.. edb:tag:: dart
-  .. _edgedb-dart-intro:
+.. _edgedb-dart-intro:
 
 Dart client library for EdgeDB
 ==============================
