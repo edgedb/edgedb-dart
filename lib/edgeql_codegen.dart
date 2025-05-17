@@ -290,12 +290,16 @@ _WalkCodecReturn _walkCodec(Codec codec, LibraryBuilder file,
     final codecs = <Expression>[];
     final names = <Expression>[];
     final cards = <Expression>[];
-    final namesMap = <String, Reference>{};
+    final namesMap = <String, dynamic>{};
 
     void visitField(String name, Codec subcodec, Cardinality cardinality) {
       final validName = name.replaceFirst(RegExp('^@'), '\$');
-      final child = _walkCodec(subcodec, file,
-          typeName: '${typeName}_$validName', isArgsCodec: isArgsCodec);
+      final child = _walkCodec(
+        subcodec,
+        file,
+        typeName: '${typeName}_$validName',
+        isArgsCodec: isArgsCodec,
+      );
       final typeField = FieldBuilder()
         ..name = validName
         ..modifier = FieldModifier.final$
@@ -314,7 +318,10 @@ _WalkCodecReturn _walkCodec(Codec codec, LibraryBuilder file,
       codecs.add(child.codecExpr);
       names.add(literalString(name));
       cards.add(literalNum(cardinality.value));
-      namesMap[name] = Reference(validName);
+      namesMap[name] = {
+        'ref': Reference(validName),
+        'mappable': child.classExpr != null,
+      };
     }
 
     if (codec is ObjectCodec) {
@@ -336,7 +343,14 @@ _WalkCodecReturn _walkCodec(Codec codec, LibraryBuilder file,
     typeClass.methods.add((MethodBuilder()
           ..name = 'toMap'
           ..returns = Reference('Map<String, dynamic>')
-          ..body = literalMap(namesMap).returned.statement)
+          ..body = literalMap(namesMap.map((key, value) {
+            final ref = value['ref'] as Reference;
+            final mappable = value['mappable'] as bool;
+            return MapEntry(
+              literalString(key),
+              mappable ? ref.property('toMap').call([]) : ref,
+            );
+          })).returned.statement)
         .build());
     typeClass.methods.add((MethodBuilder()
           ..name = 'toJson'
